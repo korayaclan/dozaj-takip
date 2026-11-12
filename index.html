@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="theme-color" content="#F5F4F0" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <title>Dozaj — Günlük Takip</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['IBM Plex Mono', 'monospace'],
+          },
+          colors: {
+            paper: '#F5F4F0',
+            surface: '#FFFFFF',
+            ink: '#141413',
+            muted: '#73726E',
+            line: '#E4E2DC',
+            signal: '#E04819',
+            forest: '#166534',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #F5F4F0; color: #141413; -webkit-tap-highlight-color: transparent; }
+    .no-select { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    @keyframes bubble-rise {
+      0% { transform: translateY(0) scale(0.5); opacity: 0; }
+      20% { opacity: 0.85; }
+      100% { transform: translateY(-64px) translateX(var(--drift, 8px)) scale(1.1); opacity: 0; }
+    }
+    .bubble {
+      position: absolute; bottom: 4px; border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.35); border: 1px solid rgba(255, 255, 255, 0.75);
+      pointer-events: none; animation: bubble-rise var(--dur, 0.9s) cubic-bezier(0.2, 0.8, 0.4, 1) forwards;
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="font-sans antialiased min-h-screen pb-20">
+
+  <!-- Toast Mesajı -->
+  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 w-[90%] max-w-md z-50 pointer-events-none transition-all duration-300 translate-y-20 opacity-0">
+    <div class="bg-ink text-white px-4 py-3 rounded-lg shadow-xl flex items-center justify-between gap-3 border border-neutral-700">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <span class="w-2 h-2 rounded-full bg-signal shrink-0"></span>
+        <p id="toast-msg" class="text-xs font-medium truncate"></p>
+      </div>
+      <span id="toast-time" class="font-mono text-[11px] text-neutral-400 shrink-0"></span>
+    </div>
+  </div>
+
+  <!-- EKRAN 0: EŞLEŞME (AİLE KODU) EKRANI -->
+  <div id="screen-onboarding" class="hidden max-w-md mx-auto px-5 pt-12">
+    <p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">AİLE EŞLEŞTİRME</p>
+    <h1 class="text-2xl font-bold tracking-tight text-ink mt-1">Dozaj Takip</h1>
+    <p class="text-sm text-muted mt-2 leading-relaxed">
+      Şurup ve takviye kayıtlarının iki telefonda anlık senkronize olması için tek seferlik aile kodunuzu oluşturun veya eşinizin kodunu girin.
+    </p>
+
+    <div class="mt-6 bg-surface border border-line rounded-xl p-5 space-y-5">
+      <!-- Kim Kullanıyor? -->
+      <div>
+        <label class="block text-xs font-semibold text-ink mb-2">Bu telefon kimin?</label>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" onclick="selectOnboardingProfile('Anne')" id="onb-anne" class="py-2.5 text-sm font-semibold rounded-md border border-ink bg-ink text-white transition">Anne</button>
+          <button type="button" onclick="selectOnboardingProfile('Baba')" id="onb-baba" class="py-2.5 text-sm font-semibold rounded-md border border-line bg-paper text-muted transition">Baba</button>
+        </div>
+      </div>
+
+      <div class="border-t border-line pt-4">
+        <button onclick="createNewFamily()" id="btn-create-fam" class="w-full py-3 bg-signal text-white text-sm font-semibold rounded-md hover:opacity-95 active:scale-[0.99] transition">
+          Yeni Aile Kodu Oluştur
+        </button>
+      </div>
+
+      <div class="relative flex py-1 items-center">
+        <div class="flex-grow border-t border-line"></div>
+        <span class="flex-shrink mx-3 text-[11px] font-mono text-muted uppercase">veya mevcut koda katıl</span>
+        <div class="flex-grow border-t border-line"></div>
+      </div>
+
+      <form onsubmit="joinExistingFamily(event)" class="flex gap-2">
+        <input id="inp-join-code" type="text" maxlength="7" placeholder="Örn: 482-915" required
+          class="flex-1 px-3 py-2.5 text-sm font-mono uppercase tracking-widest bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+        <button type="submit" id="btn-join-fam" class="px-4 py-2.5 bg-ink text-white text-xs font-semibold rounded-md hover:bg-neutral-800 transition">
+          Bağlan
+        </button>
+      </form>
+      <p id="onb-error" class="text-xs text-red-600 hidden"></p>
+    </div>
+  </div>
+
+  <!-- ANA UYGULAMA EKRANI -->
+  <div id="screen-app" class="hidden max-w-lg mx-auto px-4 pt-5">
+    
+    <!-- Üst Bar -->
+    <header class="flex items-center justify-between pb-4 border-b border-line">
+      <div class="flex items-center gap-2">
+        <span id="badge-profile" class="px-2.5 py-1 bg-ink text-white text-xs font-semibold rounded"></span>
+        <button onclick="copyFamilyCode()" class="px-2 py-1 bg-line/60 hover:bg-line text-ink font-mono text-[11px] font-medium rounded transition flex items-center gap-1" title="Aile Kodunu Kopyala">
+          <span id="badge-code"></span>
+          <svg class="w-3 h-3 text-muted" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"/></svg>
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <div class="inline-flex bg-line/60 p-0.5 rounded-md">
+          <button onclick="switchTab('routine')" id="tab-routine" class="px-3 py-1 text-xs font-semibold rounded transition-all">Takip</button>
+          <button onclick="switchTab('history')" id="tab-history" class="px-3 py-1 text-xs font-semibold rounded transition-all">Geçmiş</button>
+        </div>
+
+        <button onclick="openAddModal()" class="px-2.5 py-1.5 bg-ink text-white text-xs font-semibold rounded-md hover:bg-neutral-800 active:scale-95 transition flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+          Ekle
+        </button>
+      </div>
+    </header>
+
+    <!-- iOS / Android Bildirim Kurulum Uyarı Bandı -->
+    <div id="notif-banner" class="hidden mt-4 p-3.5 rounded-lg border border-signal/30 bg-signal/5">
+      <div id="notif-ios-guide" class="hidden">
+        <p class="text-xs font-bold text-ink">iPhone Bildirim Kurulumu</p>
+        <p class="text-xs text-muted mt-1 leading-relaxed">
+          iOS'ta bildirim alabilmek için Safari'de alttaki <strong>Paylaş</strong> simgesine dokunup <strong>"Ana Ekrana Ekle"</strong> deyin ve uygulamayı Ana Ekrandan açın.
+        </p>
+      </div>
+      <div id="notif-ask" class="hidden flex items-center justify-between gap-3">
+        <div>
+          <p class="text-xs font-bold text-ink">Bildirimler kapalı</p>
+          <p class="text-[11px] text-muted mt-0.5">Eşinizin onaylarını ve alarmları almak için açın.</p>
+        </div>
+        <button onclick="enableNotifications()" id="btn-enable-notif" class="px-3 py-2 bg-signal text-white text-xs font-semibold rounded-md shrink-0 hover:opacity-90 transition">
+          Bildirimleri Aç
+        </button>
+      </div>
+    </div>
+
+    <!-- SEKME 1: GÜNLÜK TAKİP -->
+    <section id="view-routine" class="pt-5">
+      <div class="flex items-center justify-between mb-5">
+        <div>
+          <p id="date-relative" class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted"></p>
+          <h1 id="date-title" class="text-xl font-bold tracking-tight text-ink mt-0.5"></h1>
+        </div>
+        <div class="flex items-center gap-1">
+          <button onclick="shiftDate(-1)" class="w-8 h-8 rounded-md border border-line bg-surface flex items-center justify-center text-ink hover:bg-neutral-100 active:scale-95 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
+          </button>
+          <button onclick="goToday()" id="btn-today" class="px-2.5 h-8 rounded-md border border-line bg-surface font-mono text-[11px] font-medium text-ink hover:bg-neutral-100 transition hidden">
+            Bugün
+          </button>
+          <button onclick="shiftDate(1)" id="btn-next-day" class="w-8 h-8 rounded-md border border-line bg-surface flex items-center justify-center text-ink hover:bg-neutral-100 active:scale-95 transition disabled:opacity-30 disabled:pointer-events-none">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="mb-6">
+        <div class="flex justify-between items-baseline mb-1.5">
+          <span class="text-xs font-medium text-muted">Günlük durum</span>
+          <span id="progress-label" class="font-mono text-xs font-semibold text-ink">0/0</span>
+        </div>
+        <div class="w-full h-1.5 bg-line rounded-full overflow-hidden">
+          <div id="progress-fill" class="h-full bg-ink transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div id="routine-list" class="space-y-3"></div>
+
+      <div class="mt-8 pt-4 border-t border-line flex items-center justify-between text-xs text-muted">
+        <button onclick="toggleEditMode()" id="btn-edit-mode" class="hover:text-ink underline underline-offset-4 transition">
+          Listeyi düzenle / sil
+        </button>
+        <button onclick="leaveFamily()" class="hover:text-red-600 underline underline-offset-4 transition">
+          Aile kodundan çık
+        </button>
+      </div>
+    </section>
+
+    <!-- SEKME 2: GEÇMİŞ TAKİP -->
+    <section id="view-history" class="pt-5 hidden">
+      <div class="mb-5">
+        <p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">KAYIT DEFTERİ</p>
+        <h1 class="text-xl font-bold tracking-tight text-ink mt-0.5">Son 14 Gün</h1>
+      </div>
+      <div id="history-matrix" class="bg-surface border border-line rounded-lg p-4 mb-6 overflow-x-auto no-scrollbar"></div>
+      <h2 class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted mb-3">GÜNLÜK DETAYLAR</h2>
+      <div id="history-feed" class="space-y-3"></div>
+    </section>
+
+  </div>
+
+  <!-- MODAL: YENİ RUTİN EKLE -->
+  <div id="add-modal" class="fixed inset-0 z-50 bg-ink/40 backdrop-blur-[2px] hidden items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-surface w-full max-w-md rounded-t-xl sm:rounded-xl border border-line shadow-2xl p-5">
+      <div class="flex items-center justify-between pb-3 border-b border-line mb-4">
+        <h3 class="text-base font-bold text-ink">Yeni Rutin Ekle</h3>
+        <button onclick="closeAddModal()" class="text-muted hover:text-ink p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <form onsubmit="handleAddRoutine(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-ink mb-1">Şurup / Takviye Adı</label>
+          <input id="inp-name" type="text" required placeholder="Örn: D Vitamini"
+            class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-ink mb-1">Saat / Aralık</label>
+            <input id="inp-time" type="text" required placeholder="14:00 veya 10:00-17:00"
+              class="w-full px-3 py-2 text-sm font-mono bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-ink mb-1">Not</label>
+            <input id="inp-note" type="text" placeholder="Örn: 1 ölçek"
+              class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-ink mb-1.5">Onay Tipi</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="cursor-pointer">
+              <input type="radio" name="priority" value="critical" class="peer sr-only" checked>
+              <div class="p-2.5 rounded-md border border-line peer-checked:border-signal peer-checked:bg-signal/5 transition">
+                <p class="text-xs font-bold text-ink">Kritik (Basılı Tut)</p>
+                <p class="text-[11px] text-muted mt-0.5">Baloncuklu dolum + Israrlı alarm</p>
+              </div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="priority" value="standard" class="peer sr-only">
+              <div class="p-2.5 rounded-md border border-line peer-checked:border-ink peer-checked:bg-neutral-100 transition">
+                <p class="text-xs font-bold text-ink">Standart (Tek Tık)</p>
+                <p class="text-[11px] text-muted mt-0.5">Hızlı onay + Es geçme</p>
+              </div>
+            </label>
+          </div>
+        </div>
+        <div class="pt-2 flex gap-2">
+          <button type="button" onclick="closeAddModal()" class="flex-1 py-2.5 text-xs font-semibold text-muted border border-line rounded-md hover:bg-paper">İptal</button>
+          <button type="submit" class="flex-1 py-2.5 text-xs font-semibold text-white bg-ink rounded-md hover:bg-neutral-800">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- FIREBASE ENTEGRASYONLU UYGULAMA MOTORU -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getFirestore, doc, collection, getDoc, setDoc, updateDoc, deleteField, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+
+    // ========================================================
+    // BURAYI KENDİ FIREBASE BİLGİLERİNİZLE DOLDURUN
+    // ========================================================
+    const FIREBASE_CONFIG = {
+        apiKey: "AIzaSyCL66c_rKSvUGkKxndqtam0xc8E8o9yGMs",
+        authDomain: "dozaj-takip.firebaseapp.com",
+        projectId: "dozaj-takip",
+        storageBucket: "dozaj-takip.firebasestorage.app",
+        messagingSenderId: "722903094885",
+        appId: "1:722903094885:web:000aa184a96f2e6d1cd88c",
+        measurementId: "G-1ZFBP4Z0RH"
+    };
+    const VAPID_KEY = "BAXqouxGPGrUzpF8NBoQcd2rwdHmbAUX9HCFW6mXFbJrSkKbI_fjXmNoFJjXcfQ7s_5iI0jF8zkzrjLVWVYOcJY";
+    // ========================================================
+
+    const app = initializeApp(FIREBASE_CONFIG);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    let messaging = null;
+    try { messaging = getMessaging(app); } catch (e) {}
+
+    const DEFAULT_ROUTINES = [
+      { id: 'r_syrup_am', name: 'Sabah Şurubu', time: '07:45', note: 'Kritik doz', priority: 'critical' },
+      { id: 'r_ravla', name: 'Ravla Zeytinyağı', time: '08:00', note: 'Her gün', priority: 'standard', allowSkip: false },
+      { id: 'r_mollers', name: "Möller's Balık Yağı", time: '10:00–17:00', note: 'Esnek pencere', priority: 'standard', allowSkip: true },
+      { id: 'r_syrup_pm', name: 'Akşam Şurubu', time: '19:45', note: 'Kritik doz', priority: 'critical' }
+    ];
+
+    function getTodayKey() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    function parseDateKey(key) {
+      const [y, m, d] = key.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    let familyCode = localStorage.getItem('dozaj_family_code') || '';
+    let currentProfile = localStorage.getItem('dozaj_profile') || 'Anne';
+    let onboardingProfile = 'Anne';
+    let routines = DEFAULT_ROUTINES;
+    let logs = {};
+    let selectedDateKey = getTodayKey();
+    let activeTab = 'routine';
+    let editMode = false;
+    let unsubFamily = null;
+    let unsubLogs = null;
+
+    // --- BAŞLATMA ---
+    async function boot() {
+      await signInAnonymously(auth);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(console.error);
+      }
+      if (familyCode) {
+        startSyncedApp();
+      } else {
+        document.getElementById('screen-onboarding').classList.remove('hidden');
+      }
+    }
+
+    // --- EŞLEŞTİRME FONKSİYONLARI ---
+    window.selectOnboardingProfile = (p) => {
+      onboardingProfile = p;
+      const onCls = 'py-2.5 text-sm font-semibold rounded-md border border-ink bg-ink text-white transition';
+      const offCls = 'py-2.5 text-sm font-semibold rounded-md border border-line bg-paper text-muted transition';
+      document.getElementById('onb-anne').className = p === 'Anne' ? onCls : offCls;
+      document.getElementById('onb-baba').className = p === 'Baba' ? onCls : offCls;
+    };
+
+    window.createNewFamily = async () => {
+      const btn = document.getElementById('btn-create-fam');
+      btn.disabled = true; btn.textContent = 'Oluşturuluyor...';
+      const code = `${Math.floor(100 + Math.random() * 900)}-${Math.floor(100 + Math.random() * 900)}`;
+      await setDoc(doc(db, 'families', code), {
+        createdAt: Date.now(),
+        routines: DEFAULT_ROUTINES,
+        tokens: {}
+      });
+      familyCode = code;
+      currentProfile = onboardingProfile;
+      localStorage.setItem('dozaj_family_code', familyCode);
+      localStorage.setItem('dozaj_profile', currentProfile);
+      startSyncedApp();
+    };
+
+    window.joinExistingFamily = async (e) => {
+      e.preventDefault();
+      const errEl = document.getElementById('onb-error');
+      errEl.classList.add('hidden');
+      const raw = document.getElementById('inp-join-code').value.trim().toUpperCase();
+      const famSnap = await getDoc(doc(db, 'families', raw));
+      if (!famSnap.exists()) {
+        errEl.textContent = 'Bu aile kodu bulunamadı. Kodu kontrol edin.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      familyCode = raw;
+      currentProfile = onboardingProfile;
+      localStorage.setItem('dozaj_family_code', familyCode);
+      localStorage.setItem('dozaj_profile', currentProfile);
+      startSyncedApp();
+    };
+
+    window.leaveFamily = () => {
+      if (!confirm('Bu cihazdaki aile kodundan çıkış yapılsın mı?')) return;
+      localStorage.removeItem('dozaj_family_code');
+      location.reload();
+    };
+
+    window.copyFamilyCode = () => {
+      navigator.clipboard?.writeText(familyCode);
+      showToast(`Aile kodu kopyalandı: ${familyCode}`, 'KOD');
+    };
+
+    // --- CANLI SENKRONİZASYON ---
+    function startSyncedApp() {
+      document.getElementById('screen-onboarding').classList.add('hidden');
+      document.getElementById('screen-app').classList.remove('hidden');
+      document.getElementById('badge-profile').textContent = currentProfile;
+      document.getElementById('badge-code').textContent = familyCode;
+
+      checkNotificationUI();
+
+      // 1. Rutinleri canlı dinle
+      unsubFamily = onSnapshot(doc(db, 'families', familyCode), (snap) => {
+        if (snap.exists()) {
+          routines = snap.data().routines || DEFAULT_ROUTINES;
+          if (activeTab === 'routine') renderRoutine();
+          else renderHistory();
+        }
+      });
+
+      // 2. Günlük kayıtları canlı dinle
+      unsubLogs = onSnapshot(collection(db, 'families', familyCode, 'logs'), (snap) => {
+        const nextLogs = {};
+        snap.forEach(d => { nextLogs[d.id] = d.data(); });
+        logs = nextLogs;
+        if (activeTab === 'routine') renderRoutine();
+        else renderHistory();
+      });
+    }
+
+    // --- BİLDİRİM İZNİ & TOKEN KAYDI (iOS + Android Uyumlu) ---
+    function checkNotificationUI() {
+      const banner = document.getElementById('notif-banner');
+      const iosGuide = document.getElementById('notif-ios-guide');
+      const askBox = document.getElementById('notif-ask');
+
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+      if (isIOS && !isStandalone) {
+        banner.classList.remove('hidden');
+        iosGuide.classList.remove('hidden');
+        askBox.classList.add('hidden');
+        return;
+      }
+
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        banner.classList.remove('hidden');
+        iosGuide.classList.add('hidden');
+        askBox.classList.remove('hidden');
+      } else if ('Notification' in window && Notification.permission === 'granted') {
+        banner.classList.add('hidden');
+        syncPushToken();
+      }
+    }
+
+    window.enableNotifications = async () => {
+      const btn = document.getElementById('btn-enable-notif');
+      btn.disabled = true; btn.textContent = 'Açılıyor...';
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          await syncPushToken();
+          document.getElementById('notif-banner').classList.add('hidden');
+          showToast('Bildirimler aktifleştirildi!', 'HAZIR');
+        } else {
+          btn.disabled = false; btn.textContent = 'İzin Verilmedi';
+        }
+      } catch (e) {
+        console.error(e);
+        btn.disabled = false; btn.textContent = 'Tekrar Dene';
+      }
+    };
+
+    async function syncPushToken() {
+      if (!messaging) return;
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+        if (token) {
+          await updateDoc(doc(db, 'families', familyCode), {
+            [`tokens.${currentProfile}`]: token
+          });
+        }
+      } catch (e) { console.error('Token hatası:', e); }
+    }
+
+    // --- KAYIT & EŞE BİLDİRİM ---
+    window.recordAction = async (routineId, status) => {
+      const routine = routines.find(r => r.id === routineId);
+      const nowTime = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+
+      if (navigator.vibrate) navigator.vibrate([30, 20, 50]);
+      playConfirmTone();
+
+      await setDoc(doc(db, 'families', familyCode, 'logs', selectedDateKey), {
+        [routineId]: { status, by: currentProfile, time: nowTime }
+      }, { merge: true });
+
+      const partner = currentProfile === 'Anne' ? 'Baba' : 'Anne';
+      showToast(status === 'skipped' ? `${partner}'ya iletildi (Es geçildi)` : `${partner}'ya iletildi: ${routine.name}`, nowTime);
+
+      // Sunucu üzerinden karşı tarafa gerçek Push Bildirimi at
+      fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          familyCode,
+          senderProfile: currentProfile,
+          routineName: routine.name,
+          status,
+          time: nowTime
+        })
+      }).catch(console.error);
+    };
+
+    window.undoAction = async (routineId) => {
+      await updateDoc(doc(db, 'families', familyCode, 'logs', selectedDateKey), {
+        [routineId]: deleteField()
+      });
+    };
+
+    // --- UI VE ETKİLEŞİM (Aynı keskin tasarım) ---
+    window.switchTab = (tab) => {
+      activeTab = tab;
+      document.getElementById('view-routine').classList.toggle('hidden', tab !== 'routine');
+      document.getElementById('view-history').classList.toggle('hidden', tab !== 'history');
+      const on = 'px-3 py-1 text-xs font-semibold rounded bg-surface text-ink shadow-sm transition-all';
+      const off = 'px-3 py-1 text-xs font-medium rounded text-muted hover:text-ink transition-all';
+      document.getElementById('tab-routine').className = tab === 'routine' ? on : off;
+      document.getElementById('tab-history').className = tab === 'history' ? on : off;
+      if (tab === 'history') renderHistory(); else renderRoutine();
+    };
+
+    window.shiftDate = (delta) => {
+      const d = parseDateKey(selectedDateKey);
+      d.setDate(d.getDate() + delta);
+      const next = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      if (next > getTodayKey()) return;
+      selectedDateKey = next;
+      renderRoutine();
+    };
+
+    window.goToday = () => { selectedDateKey = getTodayKey(); renderRoutine(); };
+    window.jumpToDate = (k) => { selectedDateKey = k; window.switchTab('routine'); };
+
+    function playConfirmTone() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(); osc.stop(ctx.currentTime + 0.15);
+      } catch (e) {}
+    }
+
+    let toastTimer;
+    function showToast(msg, time) {
+      document.getElementById('toast-msg').textContent = msg;
+      document.getElementById('toast-time').textContent = time;
+      const el = document.getElementById('toast');
+      el.classList.remove('translate-y-20', 'opacity-0');
+      el.classList.add('translate-y-0', 'opacity-100');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        el.classList.add('translate-y-20', 'opacity-0');
+        el.classList.remove('translate-y-0', 'opacity-100');
+      }, 3400);
+    }
+
+    function attachHoldMechanic(btnElement, routineId) {
+      const fill = btnElement.querySelector('.fill-layer');
+      const bubbles = btnElement.querySelector('.bubbles-layer');
+      const label = btnElement.querySelector('.label-layer');
+      let holding = false, progress = 0, raf = null, bTimer = null, lastTs = null;
+      const DURATION = 2000;
+
+      function spawnBubble() {
+        const b = document.createElement('div');
+        const size = Math.random() * 9 + 5;
+        b.className = 'bubble';
+        b.style.width = `${size}px`; b.style.height = `${size}px`;
+        b.style.left = `${Math.random() * 88 + 6}%`;
+        b.style.setProperty('--drift', `${(Math.random() - 0.5) * 24}px`);
+        b.style.setProperty('--dur', `${Math.random() * 0.5 + 0.5}s`);
+        bubbles.appendChild(b);
+        setTimeout(() => b.remove(), 1100);
+      }
+
+      function step(ts) {
+        if (!lastTs) lastTs = ts;
+        const dt = ts - lastTs; lastTs = ts;
+        if (holding) {
+          progress += (dt / DURATION) * 100;
+          if (progress >= 100) {
+            progress = 100; paint(); endHold();
+            window.recordAction(routineId, 'done');
+            return;
+          }
+          paint(); raf = requestAnimationFrame(step);
+        } else {
+          progress -= (dt / 380) * 100;
+          if (progress <= 0) {
+            progress = 0; paint(); cancelAnimationFrame(raf); raf = null; return;
+          }
+          paint(); raf = requestAnimationFrame(step);
+        }
+      }
+
+      function paint() {
+        fill.style.height = `${progress}%`;
+        label.classList.toggle('text-white', progress > 48);
+        label.classList.toggle('text-signal', progress <= 48);
+        label.textContent = holding ? `BASILI TUTULUYOR · ${Math.floor(progress)}%` : (progress > 0 ? 'GERİ DÖNÜYOR...' : 'VERMEK İÇİN BASILI TUT');
+      }
+
+      function beginHold(e) {
+        e.preventDefault(); if (holding) return;
+        holding = true; lastTs = null;
+        if (navigator.vibrate) navigator.vibrate(12);
+        if (!bTimer) { spawnBubble(); bTimer = setInterval(spawnBubble, 95); }
+        if (!raf) raf = requestAnimationFrame(step);
+      }
+      function endHold() {
+        if (!holding) return;
+        holding = false; lastTs = null; clearInterval(bTimer); bTimer = null;
+      }
+
+      btnElement.addEventListener('pointerdown', beginHold);
+      btnElement.addEventListener('pointerup', endHold);
+      btnElement.addEventListener('pointerleave', endHold);
+      btnElement.addEventListener('pointercancel', endHold);
+    }
+
+    function renderRoutine() {
+      const todayKey = getTodayKey();
+      const dateObj = parseDateKey(selectedDateKey);
+      const isToday = selectedDateKey === todayKey;
+      const y = new Date(); y.setDate(y.getDate() - 1);
+      const isYesterday = selectedDateKey === `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+
+      document.getElementById('date-relative').textContent = isToday ? 'BUGÜN' : (isYesterday ? 'DÜN' : 'GEÇMİŞ KAYIT');
+      document.getElementById('date-title').textContent = dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' });
+      document.getElementById('btn-next-day').disabled = isToday;
+      document.getElementById('btn-today').classList.toggle('hidden', isToday);
+
+      const dayLogs = logs[selectedDateKey] || {};
+      const listEl = document.getElementById('routine-list');
+      listEl.innerHTML = '';
+      let completedCount = 0;
+
+      routines.forEach(r => {
+        const entry = dayLogs[r.id];
+        if (entry) completedCount++;
+        const isDone = entry && entry.status === 'done';
+        const isSkipped = entry && entry.status === 'skipped';
+
+        const card = document.createElement('div');
+        card.className = `bg-surface rounded-lg border transition-all p-4 ${isDone ? 'border-line bg-surface/70' : (r.priority === 'critical' && !entry ? 'border-ink/25 shadow-sm' : 'border-line')}`;
+
+        const headerHtml = `
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex items-start gap-3">
+              <div class="pt-0.5">
+                <span class="inline-block font-mono text-xs font-semibold px-2 py-0.5 rounded ${isDone ? 'bg-emerald-50 text-forest' : (r.priority === 'critical' ? 'bg-signal/10 text-signal' : 'bg-paper text-ink')}">${r.time}</span>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold ${isDone || isSkipped ? 'text-muted line-through decoration-muted/50' : 'text-ink'}">${r.name}</h3>
+                ${r.note ? `<p class="text-xs text-muted mt-0.5">${r.note}</p>` : ''}
+              </div>
+            </div>
+            ${editMode ? `<button onclick="deleteRoutine('${r.id}')" class="text-xs font-semibold text-red-600 hover:underline shrink-0">Sil</button>`
+              : (entry ? `<button onclick="undoAction('${r.id}')" class="text-[11px] font-medium text-muted hover:text-ink underline underline-offset-2 shrink-0">Geri al</button>` : '')}
+          </div>`;
+
+        let actionHtml = '';
+        if (entry) {
+          actionHtml = isDone
+            ? `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold text-forest"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>${entry.by} tarafından verildi</span><span class="font-mono text-muted font-medium">${entry.time}</span></div>`
+            : `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs text-muted"><span>${entry.by} tarafından es geçildi</span><span class="font-mono">${entry.time}</span></div>`;
+        } else if (!editMode) {
+          actionHtml = r.priority === 'critical'
+            ? `<div id="hold-${r.id}" class="mt-3.5 relative w-full h-11 rounded-md border border-signal/40 bg-signal/5 overflow-hidden no-select cursor-pointer touch-none" oncontextmenu="return false;"><div class="fill-layer absolute bottom-0 left-0 right-0 h-0 bg-signal pointer-events-none"></div><div class="bubbles-layer absolute inset-0 overflow-hidden pointer-events-none"></div><div class="label-layer relative z-10 w-full h-full flex items-center justify-center font-mono text-[11px] font-semibold tracking-wider text-signal pointer-events-none">VERMEK İÇİN BASILI TUT</div></div>`
+            : `<div class="mt-3.5 flex gap-2"><button onclick="recordAction('${r.id}', 'done')" class="flex-1 h-9 rounded-md bg-ink text-white text-xs font-semibold hover:bg-neutral-800 active:scale-[0.99] transition">Verildi Olarak İşaretle</button>${r.allowSkip !== false ? `<button onclick="recordAction('${r.id}', 'skipped')" class="px-3 h-9 rounded-md border border-line bg-paper text-muted text-xs font-medium hover:text-ink transition">Bugün Yok</button>` : ''}</div>`;
+        }
+
+        card.innerHTML = headerHtml + actionHtml;
+        listEl.appendChild(card);
+        if (!entry && !editMode && r.priority === 'critical') attachHoldMechanic(document.getElementById(`hold-${r.id}`), r.id);
+      });
+
+      document.getElementById('progress-label').textContent = `${completedCount}/${routines.length}`;
+      document.getElementById('progress-fill').style.width = routines.length > 0 ? `${(completedCount / routines.length) * 100}%` : '0%';
+    }
+
+    function renderHistory() {
+      const todayKey = getTodayKey();
+      const days = [];
+      const base = new Date();
+      for (let i = 0; i < 14; i++) {
+        const d = new Date(base); d.setDate(base.getDate() - i);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        days.push({
+          key, dayNum: d.getDate(),
+          dayShort: d.toLocaleDateString('tr-TR', { weekday: 'short' }).slice(0, 2),
+          fullLabel: i === 0 ? 'Bugün' : (i === 1 ? 'Dün' : d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', weekday: 'short' }))
+        });
+      }
+
+      const matrixEl = document.getElementById('history-matrix');
+      const chrono = [...days].reverse();
+      let html = `<table class="w-full text-left border-collapse"><thead><tr><th class="text-[11px] font-semibold text-muted pb-2 pr-3 whitespace-nowrap">Rutin</th>`;
+      chrono.forEach(d => {
+        html += `<th class="text-center pb-2 px-1"><button onclick="jumpToDate('${d.key}')" class="hover:bg-paper rounded px-1 py-0.5"><span class="block font-mono text-[10px] text-muted">${d.dayShort}</span><span class="block font-mono text-[11px] font-semibold ${d.key === todayKey ? 'text-signal' : 'text-ink'}">${d.dayNum}</span></button></th>`;
+      });
+      html += `</tr></thead><tbody class="divide-y divide-line/60">`;
+      routines.forEach(r => {
+        html += `<tr><td class="py-2.5 pr-3 text-xs font-semibold text-ink whitespace-nowrap max-w-[120px] truncate">${r.name}</td>`;
+        chrono.forEach(d => {
+          const e = (logs[d.key] || {})[r.id];
+          const dot = e?.status === 'done' ? `<span class="inline-block w-2.5 h-2.5 rounded-full bg-forest"></span>`
+            : (e?.status === 'skipped' ? `<span class="inline-block w-2.5 h-2.5 rounded-full border border-muted"></span>`
+            : `<span class="inline-block w-2.5 h-2.5 rounded-full bg-line"></span>`);
+          html += `<td class="text-center py-2.5 px-1">${dot}</td>`;
+        });
+        html += `</tr>`;
+      });
+      html += `</tbody></table><div class="mt-3 pt-2.5 border-t border-line flex items-center gap-4 text-[11px] text-muted"><span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-forest"></span> Verildi</span><span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full border border-muted"></span> Es geçildi</span><span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-line"></span> Kayıt yok</span></div>`;
+      matrixEl.innerHTML = html;
+
+      const feedEl = document.getElementById('history-feed');
+      feedEl.innerHTML = '';
+      days.forEach(d => {
+        const dayLogs = logs[d.key] || {};
+        const entries = routines.map(r => ({ routine: r, log: dayLogs[r.id] })).filter(x => x.log);
+        const card = document.createElement('div');
+        card.className = 'bg-surface border border-line rounded-lg p-3.5';
+        let rows = entries.length === 0 ? `<p class="text-xs text-muted italic mt-1">Kayıt girilmemiş.</p>` : `<div class="mt-2 space-y-1.5">` + entries.map(({ routine, log }) => `
+          <div class="flex items-center justify-between text-xs"><span class="font-medium text-ink">${routine.name}</span><span class="font-mono text-[11px] ${log.status === 'done' ? 'text-forest' : 'text-muted'}">${log.status === 'done' ? `${log.by} · ${log.time}` : `Es geçildi (${log.by})`}</span></div>`).join('') + `</div>`;
+        card.innerHTML = `<div class="flex items-center justify-between border-b border-line/60 pb-2"><span class="text-xs font-bold text-ink">${d.fullLabel}</span><button onclick="jumpToDate('${d.key}')" class="font-mono text-[11px] text-muted hover:text-ink underline underline-offset-2">Güne git →</button></div>${rows}`;
+        feedEl.appendChild(card);
+      });
+    }
+
+    // --- ŞURUP EKLE / SİL ---
+    window.openAddModal = () => {
+      document.getElementById('add-modal').classList.remove('hidden');
+      document.getElementById('add-modal').classList.add('flex');
+      document.getElementById('inp-name').focus();
+    };
+    window.closeAddModal = () => {
+      document.getElementById('add-modal').classList.add('hidden');
+      document.getElementById('add-modal').classList.remove('flex');
+    };
+    window.handleAddRoutine = async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('inp-name').value.trim();
+      const time = document.getElementById('inp-time').value.trim();
+      const note = document.getElementById('inp-note').value.trim();
+      const priority = document.querySelector('input[name="priority"]:checked').value;
+      const updated = [...routines, { id: 'r_' + Date.now(), name, time, note, priority, allowSkip: priority !== 'critical' }];
+      await updateDoc(doc(db, 'families', familyCode), { routines: updated });
+      e.target.reset();
+      window.closeAddModal();
+    };
+    window.toggleEditMode = () => {
+      editMode = !editMode;
+      document.getElementById('btn-edit-mode').textContent = editMode ? 'Düzenlemeyi bitir' : 'Listeyi düzenle / sil';
+      renderRoutine();
+    };
+    window.deleteRoutine = async (id) => {
+      const updated = routines.filter(r => r.id !== id);
+      await updateDoc(doc(db, 'families', familyCode), { routines: updated });
+    };
+
+    window.switchTab('routine');
+    boot();
+  </script>
+</body>
+</html>
