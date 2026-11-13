@@ -36,6 +36,7 @@ module.exports = async (req, res) => {
       ? `${senderProfile}, ${time} itibarıyla bugünlük es geçti.`
       : `${senderProfile} tarafından ${time}'de onaylandı.`;
 
+    try {
     await admin.messaging().send({
       token: targetToken,
       notification: { title, body },
@@ -45,13 +46,23 @@ module.exports = async (req, res) => {
           title,
           body,
           icon: '/icon-192.png',
-          badge: '/icon-192.png',
+          badge: '/badge-96.png',
           tag: 'dozaj-sync',
           renotify: true,
           vibrate: [120, 60, 120]
         }
       }
     });
+
+    } catch (sendErr) {
+      // Süresi dolmuş / geçersiz token'ı temizle; eş uygulamayı açınca yenisi kaydedilir.
+      const dead = ['messaging/registration-token-not-registered', 'messaging/invalid-registration-token', 'messaging/invalid-argument'];
+      if (dead.includes(sendErr.code)) {
+        await famDoc.ref.update({ [`tokens.${partner}`]: admin.firestore.FieldValue.delete() });
+        return res.status(200).json({ ok: true, skipped: 'Partner token was stale and has been removed' });
+      }
+      throw sendErr;
+    }
 
     return res.status(200).json({ ok: true });
   } catch (err) {

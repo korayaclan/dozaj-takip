@@ -108,7 +108,7 @@ module.exports = async (req, res) => {
                 title,
                 body,
                 icon: '/icon-192.png',
-                badge: '/icon-192.png',
+                badge: '/badge-96.png',
                 tag: `dozaj-${r.id}`,
                 renotify: true,
                 requireInteraction: true, // Android'de dokunana kadar ekranda asılı kalır!
