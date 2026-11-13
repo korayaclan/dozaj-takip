@@ -58,6 +58,11 @@
       content: ''; position: absolute; top: 4px; bottom: 4px; left: 9%; width: 5px;
       border-radius: 9999px; background: rgba(255, 255, 255, 0.4);
     }
+    /* Kritik doz basılı tutulurken sadece basılan kart kalır, gerisi solar */
+    #screen-app > *, #view-routine > *, #routine-list > * { transition: opacity 0.25s ease; }
+    body.syrup-holding #screen-app > *:not(#view-routine),
+    body.syrup-holding #view-routine > *:not(#routine-list),
+    body.syrup-holding #routine-list > *:not(.syrup-lifted) { opacity: 0; pointer-events: none; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
@@ -631,13 +636,16 @@
     }
 
     // --- ŞURUP DOLUM ANİMASYONU ---
-    // Ekranın altından yukarı doğru yükselen, şişedeki gibi ağır ağır sallanan parlak şurup + baloncuklar.
-    // Seviye zamanla hızlanarak yükselir (p^1.8). Parmak kalkarsa şurup geri çekilir.
+    // Ekranın altından yukarı doğru hızlanarak yükselen, şişedeki gibi yaylı sallanan akışkan şurup.
+    // Seviye p^1.8 ile hızlanır; dalga boyu yükselme hızıyla büyür; parmak kalkarsa şurup geri çekilir.
     const Syrup = (() => {
       const cv = document.getElementById('syrup-canvas');
       const ctx = cv.getContext('2d');
       const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      let W = 0, H = 0, level = 0, target = 0, raf = null, last = 0, t = 0, bubbles = [], doneAt = 0, fade = 1;
+      let W = 0, H = 0, level = 0, prevLevel = 0, target = 0, raf = null, last = 0, t = 0;
+      let bubbles = [], pops = [], doneAt = 0, fade = 1;
+      let sa = 0, sv = 0, speed = 0;   // sallanma yayı: açı, açısal hız, yükselme hızı
+      let yBase = 0, amp = 14;
 
       function resize() {
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -647,17 +655,27 @@
       }
       window.addEventListener('resize', () => { if (raf) resize(); });
 
-      let yBase = 0, tilt = 0;
-      function surfaceY(x) {
-        return yBase + tilt * (x - W / 2)
-          + 13 * Math.sin((x / W) * Math.PI * 2 * 1.3 + t * 1.5)
-          + 6 * Math.sin((x / W) * Math.PI * 2 * 2.9 - t * 1.0 + 1.3);
+      // Yüzey yüksekliği: eğim (sallanma) + birbirine karışan 3 dalga. "back" = arkadaki daha açık dalga katmanı
+      function sy(x, back) {
+        const u = x / W, a = back ? amp * 0.85 : amp;
+        return yBase - (back ? 16 : 0)
+          + sa * (back ? 0.7 : 1) * (x - W / 2)
+          + a * Math.sin(u * 7.2 + t * 1.4 + (back ? 1.9 : 0))
+          + a * 0.42 * Math.sin(u * 14.5 - t * 0.9 + (back ? 0.6 : 1.3))
+          + 3 * Math.sin(u * 25.7 + t * 2.1);
+      }
+      function build(back, close) {
+        const p = new Path2D();
+        p.moveTo(0, sy(0, back));
+        for (let x = 5; x <= W + 5; x += 5) p.lineTo(x, sy(x, back));
+        if (close) { p.lineTo(W + 5, H + 40); p.lineTo(0, H + 40); p.closePath(); }
+        return p;
       }
 
       function spawnBubble() {
         if (bubbles.length > 70) return;
-        const r = Math.random() * 7 + 3;
-        bubbles.push({ x: Math.random() * W, y: H + r, r, vy: 50 + Math.random() * 70, ph: Math.random() * 6.28 });
+        const r = Math.random() * 8 + 2.5;
+        bubbles.push({ x: Math.random() * W, y: H + r, r, vy: 40 + Math.random() * 80, ph: Math.random() * 6.28 });
       }
 
       function frame(ts) {
@@ -666,7 +684,7 @@
         if (doneAt) {
           const e = ts - doneAt;
           fade = e < 250 ? 1 : Math.max(0, 1 - (e - 250) / 500);
-          if (e > 750) { level = target = 0; doneAt = 0; fade = 1; bubbles = []; }
+          if (e > 750) { level = target = prevLevel = 0; doneAt = 0; fade = 1; bubbles = []; pops = []; sa = sv = speed = 0; }
         } else {
           level += (target - level) * Math.min(1, dt * 9);
           if (Math.abs(target - level) < 0.001) level = target;
@@ -674,43 +692,51 @@
 
         ctx.clearRect(0, 0, W, H);
         if (level <= 0.002 && target === 0 && !doneAt) {
-          bubbles = []; cv.classList.add('hidden'); raf = null; last = 0; return;
+          bubbles = []; pops = []; sa = sv = speed = 0; prevLevel = 0;
+          cv.classList.add('hidden'); raf = null; last = 0; return;
         }
 
-        yBase = H + 70 - level * (H + 140);
-        tilt = Math.sin(t * 0.9) * 0.07 + Math.sin(t * 1.7 + 0.8) * 0.02; // şişede sallanma
+        // yükselme hızı -> dalga büyüklüğü ve yaylı sallanma
+        const vel = dt > 0 ? (level - prevLevel) / dt : 0; prevLevel = level;
+        speed += (Math.abs(vel) - speed) * Math.min(1, dt * 6);
+        sv += (-14 * sa - 2.4 * sv + (-vel * 0.9 + Math.sin(t * 1.1) * 0.9) * 1.6) * dt;
+        sa = Math.max(-0.16, Math.min(0.16, sa + sv * dt));
+        amp = 13 + 26 * Math.min(1, speed * 0.9);
+        yBase = H + 80 - level * (H + 160);
 
-        // yüzey yolu
         ctx.save();
         ctx.globalAlpha = fade;
-        ctx.beginPath();
-        ctx.moveTo(0, surfaceY(0));
-        for (let x = 6; x <= W + 6; x += 6) ctx.lineTo(x, surfaceY(x));
-        const surfacePath = new Path2D();
-        surfacePath.moveTo(0, surfaceY(0));
-        for (let x = 6; x <= W + 6; x += 6) surfacePath.lineTo(x, surfaceY(x));
-        ctx.lineTo(W + 6, H + 40); ctx.lineTo(0, H + 40); ctx.closePath();
 
+        // arka (açık) dalga katmanı
+        const gb = ctx.createLinearGradient(0, yBase - 40, 0, yBase + H * 0.6);
+        gb.addColorStop(0, 'rgba(255,196,130,0.70)'); gb.addColorStop(1, 'rgba(230,84,30,0.65)');
+        ctx.fillStyle = gb; ctx.fill(build(true, true));
+
+        // ön (ana) şurup gövdesi
+        const front = build(false, true);
         const g = ctx.createLinearGradient(0, yBase - 30, 0, yBase + H);
-        g.addColorStop(0, 'rgba(255,154,74,0.90)');
-        g.addColorStop(0.3, 'rgba(232,80,26,0.90)');
-        g.addColorStop(1, 'rgba(143,35,7,0.93)');
-        ctx.fillStyle = g; ctx.fill();
+        g.addColorStop(0, 'rgba(255,160,80,0.95)');
+        g.addColorStop(0.3, 'rgba(233,84,28,0.96)');
+        g.addColorStop(1, 'rgba(140,34,8,0.97)');
+        ctx.fillStyle = g; ctx.fill(front);
 
-        ctx.save(); ctx.clip();
-        // cam/şurup parlaması
-        const gl = ctx.createLinearGradient(W * 0.07, 0, W * 0.15, 0);
-        gl.addColorStop(0, 'rgba(255,255,255,0)'); gl.addColorStop(0.5, 'rgba(255,255,255,0.20)'); gl.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = gl; ctx.fillRect(W * 0.07, 0, W * 0.08, H);
-        ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(W * 0.19, 0, 4, H);
+        ctx.save(); ctx.clip(front);
+        // sallanmayla kayan parlama bantları
+        const gx = W * 0.10 + sa * 170;
+        const gl = ctx.createLinearGradient(gx - W * 0.05, 0, gx + W * 0.05, 0);
+        gl.addColorStop(0, 'rgba(255,255,255,0)'); gl.addColorStop(0.5, 'rgba(255,255,255,0.24)'); gl.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = gl; ctx.fillRect(gx - W * 0.05, 0, W * 0.1, H);
+        ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(gx + W * 0.1, 0, 4, H);
 
         // baloncuklar
-        if (level > 0.02 && !doneAt || level > 0.6) { if (Math.random() < dt * 38) spawnBubble(); }
+        if ((level > 0.02 && !doneAt) || level > 0.6) { if (Math.random() < dt * 42) spawnBubble(); }
         bubbles = bubbles.filter((b) => {
-          b.vy += 70 * dt;
+          b.vy += 90 * dt;
           b.y -= b.vy * dt;
-          b.x += Math.sin(t * 3 + b.ph) * 0.35;
-          if (b.y < -20 || b.y < surfaceY(b.x) + b.r) return false; // yüzeye çıkınca patlar
+          b.x += Math.sin(t * 2.6 + b.ph) * 0.6;
+          const sY = sy(b.x, false);
+          if (b.y < sY + b.r) { if (pops.length < 30 && sY > -10 && sY < H) pops.push({ x: b.x, y: sY, r: b.r, age: 0 }); return false; }
+          if (b.y < -20) return false;
           ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 6.2832);
           ctx.fillStyle = 'rgba(255,255,255,0.20)'; ctx.fill();
           ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,0.70)'; ctx.stroke();
@@ -720,10 +746,21 @@
         });
         ctx.restore();
 
-        // parlak yüzey çizgisi
+        // parlak yüzey çizgileri (arka + ön)
         ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-        ctx.lineWidth = 7; ctx.strokeStyle = 'rgba(255,200,150,0.25)'; ctx.stroke(surfacePath);
-        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,238,215,0.9)'; ctx.stroke(surfacePath);
+        ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,236,210,0.55)'; ctx.stroke(build(true, false));
+        const sp = build(false, false);
+        ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(255,200,150,0.25)'; ctx.stroke(sp);
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,240,220,0.92)'; ctx.stroke(sp);
+
+        // yüzeyde patlayan baloncuk halkaları
+        pops = pops.filter((p) => {
+          p.age += dt; if (p.age > 0.28) return false;
+          const k = p.age / 0.28;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1 + k * 1.2), 0, 6.2832);
+          ctx.lineWidth = 1.5; ctx.strokeStyle = `rgba(255,240,220,${0.8 * (1 - k)})`; ctx.stroke();
+          return true;
+        });
         ctx.restore();
 
         raf = requestAnimationFrame(frame);
@@ -747,7 +784,11 @@
       const label = btnElement.querySelector('.label-layer');
       const card = btnElement.parentElement;
       let holding = false, progress = 0, raf = null, bTimer = null, lastTs = null;
-      const lift = (on) => { card.style.position = on ? 'relative' : ''; card.style.zIndex = on ? '45' : ''; };
+      const lift = (on) => {
+        card.style.position = on ? 'relative' : ''; card.style.zIndex = on ? '45' : '';
+        card.classList.toggle('syrup-lifted', on);
+        document.body.classList.toggle('syrup-holding', on);
+      };
       const DURATION = 2000;
 
       function spawnBubble() {
@@ -765,12 +806,13 @@
       function step(ts) {
         if (!lastTs) lastTs = ts;
         const dt = ts - lastTs; lastTs = ts;
-        if (!btnElement.isConnected) { clearInterval(bTimer); bTimer = null; Syrup.hide(); return; } // liste yeniden çizildi
+        if (!btnElement.isConnected) { clearInterval(bTimer); bTimer = null; Syrup.hide(); document.body.classList.remove('syrup-holding'); return; } // liste yeniden çizildi
         if (holding) {
           progress += (dt / DURATION) * 100;
           if (progress >= 100) {
             progress = 100; paint(); endHold();
             Syrup.finish();
+            setTimeout(() => document.body.classList.remove('syrup-holding'), 800); // şurup çekilince sayfa geri gelir
             window.recordAction(routineId, 'done');
             return;
           }
