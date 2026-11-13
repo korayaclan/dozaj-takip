@@ -58,11 +58,13 @@
       content: ''; position: absolute; top: 4px; bottom: 4px; left: 9%; width: 5px;
       border-radius: 9999px; background: rgba(255, 255, 255, 0.4);
     }
-    /* Kritik doz basılı tutulurken sadece basılan kart kalır, gerisi solar */
+    /* Kritik doz basılı tutulurken her şey (basılan kart dahil) solar, ekranda sadece şurup kalır.
+       Basılan kart görünmez olsa da parmağın altında durur, basılı tutma sürer. */
     #screen-app > *, #view-routine > *, #routine-list > * { transition: opacity 0.25s ease; }
     body.syrup-holding #screen-app > *:not(#view-routine),
     body.syrup-holding #view-routine > *:not(#routine-list),
     body.syrup-holding #routine-list > *:not(.syrup-lifted) { opacity: 0; pointer-events: none; }
+    body.syrup-holding #routine-list > .syrup-lifted { opacity: 0; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
