@@ -226,6 +226,16 @@
           Aile kodundan çık
         </button>
       </div>
+      <div class="mt-3 text-xs text-muted">
+        <button onclick="toggleNotifTest()" class="hover:text-ink underline underline-offset-4 transition">Bildirimi test et</button>
+      </div>
+      <div id="notif-test" class="hidden mt-3 p-3 border border-line rounded-md bg-surface text-xs">
+        <div class="flex gap-2 mb-3">
+          <button onclick="runNotifTest('self')" class="px-3 py-2 bg-ink text-white font-semibold rounded-md">Kendime gönder</button>
+          <button onclick="runNotifTest('partner')" class="px-3 py-2 border border-line font-semibold rounded-md">Eşime gönder</button>
+        </div>
+        <ul id="notif-test-out" class="space-y-1.5 text-ink"></ul>
+      </div>
     </section>
 
     <!-- SEKME 2: GEÇMİŞ TAKİP -->
@@ -651,6 +661,63 @@
         }
       } catch (e) { console.error('Token hatası:', e); }
     }
+
+    // --- BİLDİRİM TANISI ---
+    window.toggleNotifTest = () => document.getElementById('notif-test').classList.toggle('hidden');
+
+    window.runNotifTest = async (target) => {
+      const out = document.getElementById('notif-test-out');
+      const rows = [];
+      const add = (ok, label, detail) => {
+        rows.push(`<li>${ok ? '✅' : '❌'} ${label}${detail ? ` <span class="text-muted">— ${detail}</span>` : ''}</li>`);
+        out.innerHTML = rows.join('');
+      };
+      out.innerHTML = '<li class="text-muted">Test ediliyor...</li>';
+      try {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+        if (isIOS) add(isStandalone, 'iPhone: Ana Ekrandan açılmış', isStandalone ? '' : 'Safari sekmesinde bildirim çalışmaz');
+        add('Notification' in window, 'Tarayıcı bildirimi destekliyor');
+        const perm = 'Notification' in window ? Notification.permission : 'yok';
+        add(perm === 'granted', 'Bildirim izni', perm);
+        add(!!messaging, 'Firebase Messaging başlatıldı');
+        if (perm !== 'granted' || !messaging) return;
+
+        let token = null;
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          add(true, 'Service worker hazır');
+          token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+          add(!!token, 'Bu cihaz için FCM token alındı', token ? '' : 'Boş döndü');
+        } catch (e) {
+          add(false, 'FCM token alınamadı', e.code || e.message);
+          return;
+        }
+        if (!token) return;
+
+        try {
+          await updateDoc(doc(db, 'families', familyCode), { [`tokens.${currentProfile}`]: token });
+          add(true, 'Token Firestore\'a yazıldı');
+        } catch (e) {
+          add(false, 'Token Firestore\'a yazılamadı', e.code || e.message);
+          return;
+        }
+
+        const res = await fetch('/api/test-push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ familyCode, profile: currentProfile, target })
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) { add(false, 'Sunucu yanıtı', `HTTP ${res.status}`); return; }
+        (j.steps || []).forEach(s => add(s.ok, s.label, s.detail));
+        if ((j.steps || []).every(s => s.ok)) {
+          add(true, target === 'self' ? 'Birkaç saniye içinde bu cihazda bildirim görmelisin' : 'Eşinin cihazında bildirim görünmeli');
+        }
+      } catch (e) {
+        add(false, 'Test sırasında hata', e.code || e.message);
+      }
+    };
 
     // --- KAYIT & EŞE BİLDİRİM ---
     window.recordAction = async (routineId, status) => {
