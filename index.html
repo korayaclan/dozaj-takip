@@ -315,7 +315,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, doc, collection, getDoc, setDoc, updateDoc, deleteField, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, doc, collection, getDoc, setDoc, updateDoc, deleteField, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
     // ========================================================
@@ -357,6 +357,29 @@
       { id: 'r_syrup_pm', name: 'Akşam Şurubu', time: '19:45', note: 'Kritik doz', priority: 'critical' }
     ];
 
+    // Rutinleri başlangıç saatine göre sırala. Aynı saatte tek saatli rutin, saat aralığından önce gelir.
+    function startMinutes(time) {
+      const m = /(\d{1,2}):(\d{2})/.exec(time || '');
+      return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : 24 * 60;
+    }
+    function isRange(time) { return /\d{1,2}:\d{2}\s*[–-]\s*\d{1,2}:\d{2}/.test(time || ''); }
+    function sortRoutines(list) {
+      return list.map((r, i) => ({ r, i }))
+        .sort((a, b) => startMinutes(a.r.time) - startMinutes(b.r.time) || (isRange(a.r.time) - isRange(b.r.time)) || a.i - b.i)
+        .map(x => x.r);
+    }
+
+    // Cihaz kimliği ve oturum kilidi: aynı aile kodunda aynı profil (ör. Anne) için tek telefon geçerlidir.
+    const DEVICE_ID = (() => {
+      let d = localStorage.getItem('dozaj_device_id');
+      if (!d) {
+        d = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'd' + Date.now() + Math.random().toString(36).slice(2);
+        localStorage.setItem('dozaj_device_id', d);
+      }
+      return d;
+    })();
+    const SESSION_TTL = 14 * 24 * 60 * 60 * 1000; // 14 gün hiç açılmayan oturum geçersiz sayılır (telefon kaybı vb.)
+
     function getTodayKey() {
       const d = new Date();
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -384,10 +407,41 @@
         navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(console.error);
       }
       if (familyCode) {
+        // Çevrimdışıysa oturum kontrolü yapılamaz; kullanıcıyı dışarıda bırakmamak için devam et.
+        const r = await claimSession(familyCode, currentProfile).catch(() => ({ ok: true, offline: true }));
+        if (!r.ok) { kickOut(); return; }
         startSyncedApp();
       } else {
         document.getElementById('screen-onboarding').classList.remove('hidden');
+        let msg = null;
+        try { msg = sessionStorage.getItem('dozaj_msg'); sessionStorage.removeItem('dozaj_msg'); } catch (e) {}
+        if (msg) {
+          const errEl = document.getElementById('onb-error');
+          errEl.textContent = msg; errEl.classList.remove('hidden');
+        }
       }
+    }
+
+    // --- OTURUM KİLİDİ ---
+    async function claimSession(code, profile) {
+      const ref = doc(db, 'families', code);
+      return runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) return { ok: true, missing: true };
+        const s = (snap.data().sessions || {})[profile];
+        const now = Date.now();
+        if (s && s.deviceId !== DEVICE_ID && now - (s.lastSeen || 0) < SESSION_TTL) return { ok: false, reason: 'busy' };
+        tx.update(ref, { [`sessions.${profile}`]: { deviceId: DEVICE_ID, lastSeen: now } });
+        return { ok: true };
+      });
+    }
+
+    function kickOut() {
+      try {
+        sessionStorage.setItem('dozaj_msg', `Bu aile kodunda "${currentProfile}" oturumu başka bir telefonda açık olduğu için bu telefondaki oturum kapatıldı.`);
+      } catch (e) {}
+      localStorage.removeItem('dozaj_family_code');
+      location.reload();
     }
 
     // --- EŞLEŞTİRME FONKSİYONLARI ---
@@ -406,7 +460,8 @@
       await setDoc(doc(db, 'families', code), {
         createdAt: Date.now(),
         routines: DEFAULT_ROUTINES,
-        tokens: {}
+        tokens: {},
+        sessions: { [onboardingProfile]: { deviceId: DEVICE_ID, lastSeen: Date.now() } }
       });
       familyCode = code;
       currentProfile = onboardingProfile;
@@ -426,12 +481,20 @@
         errEl.classList.remove('hidden');
         return;
       }
-      // İki telefon da aynı profili (ör. Anne) seçerse token birbirinin üstüne yazılır ve bildirim kimseye gitmez.
-      const knownTokens = famSnap.data().tokens || {};
-      if (knownTokens[onboardingProfile]) {
+      // Aynı aile kodunda aynı profil için ikinci oturum açılamaz.
+      let claim;
+      try { claim = await claimSession(raw, onboardingProfile); }
+      catch (err) {
+        console.error(err);
+        errEl.textContent = 'Bağlantı kurulamadı. İnternetinizi kontrol edip tekrar deneyin.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      if (!claim.ok) {
         const other = onboardingProfile === 'Anne' ? 'Baba' : 'Anne';
-        const ok = confirm(`Bu aile kodunda "${onboardingProfile}" olarak zaten bir telefon kayıtlı.\n\nBu telefon ${other} ise İptal'e basıp "${other}"yı seçin.\nGerçekten ${onboardingProfile} olarak devam etmek istiyor musunuz?`);
-        if (!ok) return;
+        errEl.textContent = `Bu aile kodunda "${onboardingProfile}" zaten başka bir telefonda açık; ikinci ${onboardingProfile} oturumu açılamaz. Bu telefon ${other} ise ${other}'yı seçin. ${onboardingProfile} telefonunu değiştirdiyseniz eski telefonda "Aile kodundan çık" yapın.`;
+        errEl.classList.remove('hidden');
+        return;
       }
       familyCode = raw;
       currentProfile = onboardingProfile;
@@ -440,8 +503,20 @@
       startSyncedApp();
     };
 
-    window.leaveFamily = () => {
+    window.leaveFamily = async () => {
       if (!confirm('Bu cihazdaki aile kodundan çıkış yapılsın mı?')) return;
+      // Oturumu ve bildirim kaydını bırak ki bu profil başka telefonda açılabilsin.
+      try {
+        const ref = doc(db, 'families', familyCode);
+        await runTransaction(db, async (tx) => {
+          const snap = await tx.get(ref);
+          if (!snap.exists()) return;
+          const s = (snap.data().sessions || {})[currentProfile];
+          if (s && s.deviceId === DEVICE_ID) {
+            tx.update(ref, { [`sessions.${currentProfile}`]: deleteField(), [`tokens.${currentProfile}`]: deleteField() });
+          }
+        });
+      } catch (e) { console.error(e); }
       localStorage.removeItem('dozaj_family_code');
       location.reload();
     };
@@ -460,10 +535,24 @@
 
       checkNotificationUI();
 
+      // Uygulama tekrar öne gelince (en fazla 10 dakikada bir) oturumun "son görülme" zamanını tazele
+      let lastBeat = Date.now();
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible' || Date.now() - lastBeat < 10 * 60 * 1000) return;
+        lastBeat = Date.now();
+        claimSession(familyCode, currentProfile).then((r) => { if (!r.ok) kickOut(); }).catch(() => {});
+      });
+
       // 1. Rutinleri canlı dinle
       unsubFamily = onSnapshot(doc(db, 'families', familyCode), (snap) => {
         if (snap.exists()) {
-          routines = snap.data().routines || DEFAULT_ROUTINES;
+          // Bu profil başka bir telefona geçtiyse (bu oturum süresi dolup devralındıysa) çık; oturum yoksa yeniden al.
+          const s = (snap.data().sessions || {})[currentProfile];
+          if (!(snap.metadata && snap.metadata.fromCache)) {
+            if (s && s.deviceId !== DEVICE_ID && Date.now() - (s.lastSeen || 0) < SESSION_TTL) { kickOut(); return; }
+            if (!s) claimSession(familyCode, currentProfile).catch(() => {});
+          }
+          routines = sortRoutines(snap.data().routines || DEFAULT_ROUTINES);
           if (activeTab === 'routine') renderRoutine();
           else renderHistory();
         }
@@ -579,6 +668,12 @@
     };
 
     window.undoAction = async (routineId) => {
+      // Kaydı kim girdiyse sadece o geri alabilir
+      const entry = (logs[selectedDateKey] || {})[routineId];
+      if (entry && entry.by !== currentProfile) {
+        showToast(`Bunu sadece ${entry.by} geri alabilir`, 'İZİN YOK');
+        return;
+      }
       await updateDoc(doc(db, 'families', familyCode, 'logs', selectedDateKey), {
         [routineId]: deleteField()
       });
@@ -892,7 +987,7 @@
               </div>
             </div>
             ${editMode ? `<button onclick="deleteRoutine('${r.id}')" class="text-xs font-semibold text-red-600 hover:underline shrink-0">Sil</button>`
-              : (entry ? `<button onclick="undoAction('${r.id}')" class="text-[11px] font-medium text-muted hover:text-ink underline underline-offset-2 shrink-0">Geri al</button>` : '')}
+              : (entry && entry.by === currentProfile ? `<button onclick="undoAction('${r.id}')" class="text-[11px] font-medium text-muted hover:text-ink underline underline-offset-2 shrink-0">Geri al</button>` : '')}
           </div>`;
 
         let actionHtml = '';
@@ -980,7 +1075,7 @@
       const time = document.getElementById('inp-time').value.trim();
       const note = document.getElementById('inp-note').value.trim();
       const priority = document.querySelector('input[name="priority"]:checked').value;
-      const updated = [...routines, { id: 'r_' + Date.now(), name, time, note, priority, allowSkip: priority !== 'critical' }];
+      const updated = sortRoutines([...routines, { id: 'r_' + Date.now(), name, time, note, priority, allowSkip: priority !== 'critical' }]);
       await updateDoc(doc(db, 'families', familyCode), { routines: updated });
       e.target.reset();
       window.closeAddModal();
