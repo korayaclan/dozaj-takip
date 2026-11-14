@@ -690,7 +690,7 @@
           token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
           add(!!token, 'Bu cihaz için FCM token alındı', token ? '' : 'Boş döndü');
         } catch (e) {
-          add(false, 'FCM token alınamadı', e.code || e.message);
+          add(false, 'FCM token alınamadı', `${e.code || ''} ${(e.message || '').replace(/^Firebase: /, '').slice(0, 300)}`);
           return;
         }
         if (!token) return;
