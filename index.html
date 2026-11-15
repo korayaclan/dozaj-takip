@@ -78,6 +78,9 @@
   <!-- Şurup dolum katmanı (kritik doz basılı tutulurken ekranın altından yükselir) -->
   <canvas id="syrup-canvas" class="hidden fixed inset-0 w-full h-full z-40 pointer-events-none" aria-hidden="true"></canvas>
 
+  <!-- Hap / iğne animasyonu katmanı (kritik doz basılı tutulurken) -->
+  <div id="hold-fx" class="hidden fixed inset-0 z-40 pointer-events-none flex items-center justify-center" style="opacity:0;transition:opacity .25s ease" aria-hidden="true"></div>
+
   <!-- Toast Mesajı -->
   <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 w-[90%] max-w-md z-50 pointer-events-none transition-all duration-300 translate-y-20 opacity-0">
     <div class="bg-ink text-white px-4 py-3 rounded-lg shadow-xl flex items-center justify-between gap-3 border border-neutral-700">
@@ -281,6 +284,7 @@
       <div class="mt-3 text-xs text-muted flex flex-wrap gap-x-5 gap-y-1">
         <button onclick="exportRecords()" class="hover:text-ink underline underline-offset-4 transition">Kayıtları indir (CSV)</button>
         <button onclick="toggleNotifTest()" class="hover:text-ink underline underline-offset-4 transition">Bildirimi test et</button>
+        <button onclick="toggleHaptic()" id="btn-haptic" class="hover:text-ink underline underline-offset-4 transition">Titreşim: açık</button>
         <a href="gizlilik.html" class="hover:text-ink underline underline-offset-4 transition">Gizlilik</a>
       </div>
       <div id="notif-test" class="hidden mt-3 p-3 border border-line rounded-md bg-surface text-xs">
@@ -1477,6 +1481,124 @@
       };
     })();
 
+    // --- TİTREŞİM ---
+    // Ritim basılı tutuldukça sıklaşır (yavaştan hızlıya); tamamlanınca uzun bir vuruş verilir.
+    const Haptic = (() => {
+      const can = () => !!navigator.vibrate && localStorage.getItem('dozaj_haptic') !== 'off';
+      let lastAt = 0;
+      return {
+        enabled: () => localStorage.getItem('dozaj_haptic') !== 'off',
+        supported: () => !!navigator.vibrate,
+        start() { lastAt = 0; if (can()) navigator.vibrate(12); },
+        tick(ts, pct) {
+          if (!can()) return;
+          const k = Math.min(Math.max(pct / 100, 0), 1);
+          const gap = 260 - 205 * k;
+          if (ts - lastAt >= gap) { lastAt = ts; navigator.vibrate(10 + 16 * k); }
+        },
+        done() { if (can()) navigator.vibrate([30, 40, 30, 40, 160]); },
+        stop() { if (navigator.vibrate) navigator.vibrate(0); }
+      };
+    })();
+    function refreshHapticUI() {
+      const b = document.getElementById('btn-haptic'); if (!b) return;
+      if (!Haptic.supported()) { b.classList.add('hidden'); return; }
+      b.textContent = `Titreşim: ${Haptic.enabled() ? 'açık' : 'kapalı'}`;
+    }
+    window.toggleHaptic = () => {
+      const on = !Haptic.enabled();
+      localStorage.setItem('dozaj_haptic', on ? 'on' : 'off');
+      if (on && navigator.vibrate) navigator.vibrate(40);
+      refreshHapticUI();
+    };
+    refreshHapticUI();
+
+    // --- HAP / İĞNE ANİMASYONU ---
+    // Hap: basılı tuttukça çatlar, sallanır, tamamlanınca ikiye ayrılır. İğne: piston iner, sıvı boşalır.
+    const HoldFx = (() => {
+      const host = document.getElementById('hold-fx');
+      let kind = null, fadeT = null, finished = false, els = null, lens = [0, 0];
+      const INK = '#141413', SIG = '#E04819';
+      const clipDefs = '<clipPath id="fxl"><rect x="-200" y="-200" width="320" height="640"/></clipPath><clipPath id="fxr"><rect x="120" y="-200" width="320" height="640"/></clipPath>';
+      function pillSvg(k) {
+        const shape = (fill) => k === 'capsule'
+          ? `<rect x="36" y="80" width="168" height="80" rx="40" fill="${fill}" stroke="${INK}" stroke-width="3.5"/>`
+          : `<circle cx="120" cy="120" r="72" fill="${fill}" stroke="${INK}" stroke-width="3.5"/>`;
+        const top = k === 'capsule' ? 80 : 48, bot = k === 'capsule' ? 160 : 192, mid = 120;
+        const zig = (a, b) => { const n = 4, pts = []; for (let i = 0; i <= n; i++) { const y = a + (b - a) * i / n; pts.push(`${i ? 'L' : 'M'}${120 + (i % 2 ? 7 : -7) * (i === 0 || i === n ? 0 : 1)} ${y}`); } return pts.join(' '); };
+        return `<svg viewBox="0 0 240 240" style="width:min(78vw,340px);overflow:visible"><defs>${clipDefs}</defs>
+          <g transform="rotate(-24 120 120)">
+            <g class="fx-l"><g clip-path="url(#fxl)">${shape(k === 'capsule' ? SIG : '#fff')}<path d="M70 96q10-18 34-24" stroke="#fff" stroke-opacity=".7" stroke-width="5" fill="none" stroke-linecap="round"/></g></g>
+            <g class="fx-r"><g clip-path="url(#fxr)">${shape('#fff')}</g></g>
+            <path class="fx-c1" d="${zig(top, mid)}" stroke="${INK}" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <path class="fx-c2" d="${zig(bot, mid)}" stroke="${INK}" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </g></svg>`;
+      }
+      function syringeSvg() {
+        const ticks = [0, 1, 2, 3, 4, 5].map(i => `<path d="M90 ${112 + i * 20}h${i % 2 ? 10 : 16}" stroke="${INK}" stroke-width="2"/>`).join('');
+        return `<svg viewBox="0 0 240 340" style="height:min(70vh,440px);overflow:visible"><defs><clipPath id="fxb"><rect x="91" y="100" width="58" height="130"/></clipPath></defs>
+          <rect class="fx-liq" x="91" y="100" width="58" height="130" fill="${SIG}" fill-opacity=".88" clip-path="url(#fxb)"/>
+          <path d="M108 230h24l-4 12h-16zM120 242v52" stroke="${INK}" stroke-width="3.5" fill="#fff" stroke-linejoin="round" stroke-linecap="round"/>
+          <rect x="90" y="100" width="60" height="130" rx="5" fill="none" stroke="${INK}" stroke-width="3.5"/>
+          <path d="M76 100h88" stroke="${INK}" stroke-width="3.5" stroke-linecap="round"/>
+          ${ticks}
+          <g class="fx-plunger"><rect x="93" y="-6" width="54" height="9" rx="2" fill="#fff" stroke="${INK}" stroke-width="3.5"/><path d="M120 3V-60" stroke="${INK}" stroke-width="3.5" stroke-linecap="round"/><rect x="92" y="-72" width="56" height="12" rx="6" fill="#fff" stroke="${INK}" stroke-width="3.5"/></g>
+          <g class="fx-drops"><circle r="4.5" fill="${SIG}"/><circle r="4.5" fill="${SIG}"/><circle r="4.5" fill="${SIG}"/></g>
+        </svg>`;
+      }
+      function show(k) {
+        clearTimeout(fadeT); finished = false; kind = k;
+        host.innerHTML = k === 'syringe' ? syringeSvg() : pillSvg(k);
+        host.classList.remove('hidden'); host.style.transition = 'opacity .25s ease'; host.style.opacity = '1';
+        els = { l: host.querySelector('.fx-l'), r: host.querySelector('.fx-r'), c1: host.querySelector('.fx-c1'), c2: host.querySelector('.fx-c2'),
+                liq: host.querySelector('.fx-liq'), pl: host.querySelector('.fx-plunger'), drops: host.querySelectorAll('.fx-drops circle') };
+        if (els.c1) { lens = [els.c1.getTotalLength(), els.c2.getTotalLength()]; [els.c1, els.c2].forEach((c, i) => { c.style.strokeDasharray = lens[i]; c.style.strokeDashoffset = lens[i]; }); }
+      }
+      function paintPill(p, now) {
+        const crack = Math.min(1, p / 0.75);
+        els.c1.style.strokeDashoffset = lens[0] * (1 - crack); els.c2.style.strokeDashoffset = lens[1] * (1 - crack);
+        const shake = Math.sin(now / 22) * p * 3, gap = p * p * 7;
+        els.l.setAttribute('transform', `translate(${-gap + shake} 0) rotate(${-p * 2} 120 120)`);
+        els.r.setAttribute('transform', `translate(${gap - shake} 0) rotate(${p * 2} 120 120)`);
+      }
+      function paintSyringe(p, now) {
+        const y = 100 + 130 * Math.min(p, 1);
+        els.pl.setAttribute('transform', `translate(0 ${y})`);
+        els.liq.setAttribute('y', y); els.liq.setAttribute('height', 230 - y);
+        els.drops.forEach((d, i) => {
+          const ph = ((now / 520) + i / 3) % 1, on = p > 0.03 && p < 1;
+          d.setAttribute('cx', 120); d.setAttribute('cy', 296 + ph * 34); d.setAttribute('opacity', on ? (1 - ph).toFixed(2) : 0);
+        });
+      }
+      return {
+        has: (k) => k === 'tablet' || k === 'capsule' || k === 'injection',
+        begin(k) { if (kind !== k || !els || !host.isConnected || host.classList.contains('hidden') || finished) show(k === 'injection' ? 'syringe' : k); },
+        setProgress(p, now) {
+          if (!els || finished) return;
+          now = now || performance.now();
+          host.style.opacity = '1';
+          kind === 'syringe' ? paintSyringe(p, now) : paintPill(p, now);
+        },
+        finish() {
+          if (!els) return; finished = true;
+          if (kind === 'syringe') {
+            paintSyringe(1, performance.now());
+          } else {
+            els.c1.style.strokeDashoffset = 0; els.c2.style.strokeDashoffset = 0;
+            els.l.style.transition = els.r.style.transition = 'transform .5s cubic-bezier(.2,.9,.3,1)';
+            els.l.setAttribute('transform', 'translate(-46 22) rotate(-16 120 120)');
+            els.r.setAttribute('transform', 'translate(46 22) rotate(16 120 120)');
+          }
+          fadeT = setTimeout(() => { host.style.transition = 'opacity .5s ease'; host.style.opacity = '0'; fadeT = setTimeout(() => { host.classList.add('hidden'); host.innerHTML = ''; els = null; kind = null; finished = false; }, 520); }, 650);
+        },
+        hide() {
+          if (finished) return;
+          clearTimeout(fadeT); host.style.opacity = '0';
+          fadeT = setTimeout(() => { if (!finished) { host.classList.add('hidden'); host.innerHTML = ''; els = null; kind = null; } }, 280);
+        }
+      };
+    })();
+
     function attachHoldMechanic(btnElement, routineId) {
       const fill = btnElement.querySelector('.fill-layer');
       const bubbles = btnElement.querySelector('.bubbles-layer');
@@ -1489,6 +1611,12 @@
         document.body.classList.toggle('syrup-holding', on);
       };
       const DURATION = 2000;
+      const rr = routines.find(x => x.id === routineId);
+      const fxKind = rr ? iconKey(rr) : 'syrup';
+      const special = HoldFx.has(fxKind);
+      const Anim = special ? {
+        setProgress: (p) => HoldFx.setProgress(p), finish: () => HoldFx.finish(), hide: () => HoldFx.hide()
+      } : Syrup;
 
       function spawnBubble() {
         const b = document.createElement('div');
@@ -1505,21 +1633,22 @@
       function step(ts) {
         if (!lastTs) lastTs = ts;
         const dt = ts - lastTs; lastTs = ts;
-        if (!btnElement.isConnected) { clearInterval(bTimer); bTimer = null; Syrup.hide(); document.body.classList.remove('syrup-holding'); return; } // liste yeniden çizildi
+        if (!btnElement.isConnected) { clearInterval(bTimer); bTimer = null; Anim.hide(); Haptic.stop(); document.body.classList.remove('syrup-holding'); return; } // liste yeniden çizildi
         if (holding) {
           progress += (dt / DURATION) * 100;
           if (progress >= 100) {
             progress = 100; paint(); endHold();
-            Syrup.finish();
-            setTimeout(() => document.body.classList.remove('syrup-holding'), 800); // şurup çekilince sayfa geri gelir
+            Anim.finish(); Haptic.done();
+            setTimeout(() => document.body.classList.remove('syrup-holding'), special ? 1200 : 800); // şurup çekilince sayfa geri gelir
             window.recordAction(routineId, 'done');
             return;
           }
+          Haptic.tick(ts, progress);
           paint(); raf = requestAnimationFrame(step);
         } else {
           progress -= (dt / 380) * 100;
           if (progress <= 0) {
-            progress = 0; paint(); lift(false); cancelAnimationFrame(raf); raf = null; return;
+            progress = 0; paint(); lift(false); if (special) Anim.hide(); cancelAnimationFrame(raf); raf = null; return;
           }
           paint(); raf = requestAnimationFrame(step);
         }
@@ -1527,7 +1656,7 @@
 
       function paint() {
         fill.style.height = `${progress}%`;
-        Syrup.setProgress(progress / 100);
+        Anim.setProgress(progress / 100);
         label.classList.toggle('text-white', progress > 48);
         label.classList.toggle('text-signal', progress <= 48);
         label.textContent = holding ? `BASILI TUTULUYOR · ${Math.floor(progress)}%` : (progress > 0 ? 'GERİ DÖNÜYOR...' : 'VERMEK İÇİN BASILI TUT');
@@ -1536,13 +1665,16 @@
       function beginHold(e) {
         e.preventDefault(); if (holding) return;
         holding = true; lastTs = null; lift(true);
-        if (navigator.vibrate) navigator.vibrate(12);
+        Haptic.start();
+        if (special) HoldFx.begin(fxKind);
         if (!bTimer) { spawnBubble(); bTimer = setInterval(spawnBubble, 95); }
         if (!raf) raf = requestAnimationFrame(step);
       }
       function endHold() {
         if (!holding) return;
+        const wasDone = progress >= 100;
         holding = false; lastTs = null; clearInterval(bTimer); bTimer = null;
+        if (!wasDone) Haptic.stop();
       }
 
       btnElement.addEventListener('pointerdown', beginHold);
