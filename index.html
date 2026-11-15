@@ -284,7 +284,6 @@
       <div class="mt-3 text-xs text-muted flex flex-wrap gap-x-5 gap-y-1">
         <button onclick="exportRecords()" class="hover:text-ink underline underline-offset-4 transition">Kayıtları indir (CSV)</button>
         <button onclick="toggleNotifTest()" class="hover:text-ink underline underline-offset-4 transition">Bildirimi test et</button>
-        <button onclick="toggleHaptic()" id="btn-haptic" class="hover:text-ink underline underline-offset-4 transition">Titreşim: açık</button>
         <a href="gizlilik.html" class="hover:text-ink underline underline-offset-4 transition">Gizlilik</a>
       </div>
       <div id="notif-test" class="hidden mt-3 p-3 border border-line rounded-md bg-surface text-xs">
@@ -993,7 +992,7 @@
     };
 
     window.leaveFamily = async () => {
-      if (!(await uiDialog({ title: 'Çıkış yapılsın mı?', text: isSolo ? `Kayıtlarınız silinmez; ${familyCode} koduyla ya da hesabınızla tekrar giriş yapabilirsiniz.` : 'Bu telefon aile kodundan çıkar. Kayıtlar silinmez, kodla tekrar girebilirsiniz.', ok: 'Çıkış yap' }))) return;
+      if (!(await uiDialog({ title: 'Çıkış yapılsın mı?', text: (isSolo ? `Kayıtlarınız silinmez; ${familyCode} koduyla ya da hesabınızla tekrar giriş yapabilirsiniz.` : 'Bu telefon aile kodundan çıkar. Kayıtlar silinmez, kodla tekrar girebilirsiniz.') + (isLinked() ? '\nHesabınızdan (' + auth.currentUser.email + ') da çıkılır; sonra aynı hesapla tekrar girebilirsiniz.' : ''), ok: 'Çıkış yap' }))) return;
       showLoading('Çıkış yapılıyor...');
       // Oturumu ve bildirim kaydını bırak ki bu profil başka telefonda açılabilsin.
       try {
@@ -1009,6 +1008,8 @@
       } catch (e) { console.error(e); }
       localStorage.removeItem('dozaj_family_code');
       localStorage.removeItem('dozaj_mode');
+      // Hesaba bağlıysa hesaptan da çık: sonra açılacak yeni/deneme alanı hesabın kayıtlı ailesini ezmesin
+      if (isLinked()) { try { await signOut(auth); } catch (e) { console.error(e); } }
       location.reload();
     };
 
@@ -1157,7 +1158,6 @@
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
         const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
         if (isIOS) add(isStandalone, 'iPhone: Ana Ekrandan açılmış', isStandalone ? '' : 'Safari sekmesinde bildirim çalışmaz');
-        add(!!navigator.vibrate, 'Titreşim desteği', navigator.vibrate ? (localStorage.getItem('dozaj_haptic') === 'off' ? 'uygulamada kapalı' : 'açık') : 'bu tarayıcı titreşimi desteklemiyor');
         add('Notification' in window, 'Tarayıcı bildirimi destekliyor');
         const perm = 'Notification' in window ? Notification.permission : 'yok';
         add(perm === 'granted', 'Bildirim izni', perm);
@@ -1482,38 +1482,6 @@
       };
     })();
 
-    // --- TİTREŞİM ---
-    // Ritim basılı tutuldukça sıklaşır (yavaştan hızlıya); tamamlanınca uzun bir vuruş verilir.
-    const Haptic = (() => {
-      const can = () => !!navigator.vibrate && localStorage.getItem('dozaj_haptic') !== 'off';
-      let lastAt = 0;
-      return {
-        enabled: () => localStorage.getItem('dozaj_haptic') !== 'off',
-        supported: () => !!navigator.vibrate,
-        start() { lastAt = 0; if (can()) navigator.vibrate(45); },
-        tick(ts, pct) {
-          if (!can()) return;
-          const k = Math.min(Math.max(pct / 100, 0), 1);
-          const gap = 300 - 190 * k;
-          if (ts - lastAt >= gap) { lastAt = ts; navigator.vibrate(35 + 30 * k); }
-        },
-        done() { if (can()) navigator.vibrate([60, 50, 60, 50, 250]); },
-        stop() { if (navigator.vibrate) navigator.vibrate(0); }
-      };
-    })();
-    function refreshHapticUI() {
-      const b = document.getElementById('btn-haptic'); if (!b) return;
-      if (!Haptic.supported()) { b.classList.add('hidden'); return; }
-      b.textContent = `Titreşim: ${Haptic.enabled() ? 'açık' : 'kapalı'}`;
-    }
-    window.toggleHaptic = () => {
-      const on = !Haptic.enabled();
-      localStorage.setItem('dozaj_haptic', on ? 'on' : 'off');
-      if (on && navigator.vibrate) navigator.vibrate([80, 60, 120]);
-      refreshHapticUI();
-    };
-    refreshHapticUI();
-
     // --- HAP / İĞNE ANİMASYONU ---
     // Hap: basılı tuttukça çatlar, sallanır, tamamlanınca ikiye ayrılır. İğne: piston iner, sıvı boşalır.
     const HoldFx = (() => {
@@ -1634,17 +1602,16 @@
       function step(ts) {
         if (!lastTs) lastTs = ts;
         const dt = ts - lastTs; lastTs = ts;
-        if (!btnElement.isConnected) { clearInterval(bTimer); bTimer = null; Anim.hide(); Haptic.stop(); document.body.classList.remove('syrup-holding'); return; } // liste yeniden çizildi
+        if (!btnElement.isConnected) { clearInterval(bTimer); bTimer = null; Anim.hide(); document.body.classList.remove('syrup-holding'); return; } // liste yeniden çizildi
         if (holding) {
           progress += (dt / DURATION) * 100;
           if (progress >= 100) {
             progress = 100; paint(); endHold();
-            Anim.finish(); Haptic.done();
+            Anim.finish();
             setTimeout(() => document.body.classList.remove('syrup-holding'), special ? 1200 : 800); // şurup çekilince sayfa geri gelir
             window.recordAction(routineId, 'done');
             return;
           }
-          Haptic.tick(ts, progress);
           paint(); raf = requestAnimationFrame(step);
         } else {
           progress -= (dt / 380) * 100;
@@ -1666,16 +1633,13 @@
       function beginHold(e) {
         e.preventDefault(); if (holding) return;
         holding = true; lastTs = null; lift(true);
-        Haptic.start();
         if (special) HoldFx.begin(fxKind);
         if (!bTimer) { spawnBubble(); bTimer = setInterval(spawnBubble, 95); }
         if (!raf) raf = requestAnimationFrame(step);
       }
       function endHold() {
         if (!holding) return;
-        const wasDone = progress >= 100;
         holding = false; lastTs = null; clearInterval(bTimer); bTimer = null;
-        if (!wasDone) Haptic.stop();
       }
 
       btnElement.addEventListener('pointerdown', beginHold);
