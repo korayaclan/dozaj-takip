@@ -20,4 +20,8 @@
 2. **Hemen başla** ile tek başınıza ya da **Aile ile paylaş** bölümünden eşinizle başlayın.
 3. Aile modunda ilk kişi bir kod alır (`123-456`), diğer kişi bu kodla bağlanır.
 
+## Gizlilik
+
+Yalnızca uygulamanın çalışması için gereken veri saklanır; reklam ve izleme yoktur. Ayrıntılar: [Gizlilik](https://korayaclan.github.io/dozaj-takip/gizlilik.html).
+
 > Bu uygulama bir hatırlatma ve kayıt aracıdır; tıbbi tavsiye vermez. Dozlar için doktorunuza ve ilaç prospektüsüne uyun.

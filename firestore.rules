@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Kullanıcı kaydı: yalnızca sahibi okuyup yazabilir.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Aile / hesap belgesi.
+    // - Yalnızca tek tek okunabilir ("get"); koleksiyon listelenemez,
+    //   yani birisi tüm aile kodlarını toplu çekemez.
+    // - Kod biçimi 123-456 olmalı, belge silinemez, bilinen alanlar dışında alan eklenemez.
+    match /families/{code} {
+      allow get: if request.auth != null;
+      allow list: if false;
+      allow create: if request.auth != null
+        && code.matches('^[0-9]{3}-[0-9]{3}$')
+        && request.resource.data.keys().hasOnly(['createdAt', 'mode', 'routines', 'tokens', 'sessions']);
+      allow update: if request.auth != null
+        && request.resource.data.keys().hasOnly(['createdAt', 'mode', 'routines', 'tokens', 'sessions'])
+        && (!('routines' in request.resource.data) || request.resource.data.routines.size() <= 200);
+      allow delete: if false;
+
+      // Günlük kayıtlar (YYYY-MM-DD).
+      match /logs/{day} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+      }
+    }
+
+    // Geri kalan her şey kapalı.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
