@@ -116,8 +116,8 @@
       </div>
 
       <form onsubmit="joinExistingFamily(event)" class="flex gap-2">
-        <input id="inp-join-code" type="text" maxlength="7" placeholder="Örn: 482-915" required
-          class="flex-1 px-3 py-2.5 text-sm font-mono uppercase tracking-widest bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+        <input id="inp-join-code" type="text" inputmode="numeric" pattern="[0-9]{3}-[0-9]{3}" autocomplete="off" maxlength="7" placeholder="482-915" required oninput="onJoinCodeInput(event)"
+          class="flex-1 px-3 py-2.5 text-lg font-mono tracking-widest bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
         <button type="submit" id="btn-join-fam" class="px-4 py-2.5 bg-ink text-white text-xs font-semibold rounded-md hover:bg-neutral-800 transition">
           Bağlan
         </button>
@@ -348,6 +348,46 @@
     </div>
   </div>
 
+  <!-- MODAL: RUTİNİ DÜZENLE -->
+  <div id="edit-modal" class="fixed inset-0 z-50 bg-ink/40 backdrop-blur-[2px] hidden items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-surface w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-xl sm:rounded-xl border border-line shadow-2xl p-5">
+      <div class="flex items-center justify-between pb-3 border-b border-line mb-4">
+        <h3 class="text-base font-bold text-ink">Dozu Düzenle</h3>
+        <button onclick="closeEditModal()" class="text-muted hover:text-ink p-1" aria-label="Kapat">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <form onsubmit="handleEditRoutine(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-ink mb-1">Şurup / Takviye Adı</label>
+          <input id="edit-name" type="text" required class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-ink mb-1">Saat / Aralık</label>
+            <input id="edit-time" type="text" required placeholder="14:00 veya 10:00-17:00" class="w-full px-3 py-2 text-sm font-mono bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-ink mb-1">Not</label>
+            <input id="edit-note" type="text" placeholder="Örn: 1 ölçek" class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-ink mb-1.5">Onay Tipi</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="cursor-pointer"><input type="radio" name="edit-priority" value="critical" class="peer sr-only"><div class="p-2.5 rounded-md border border-line peer-checked:border-signal peer-checked:bg-signal/5 transition"><p class="text-xs font-bold text-ink">Kritik (Basılı Tut)</p></div></label>
+            <label class="cursor-pointer"><input type="radio" name="edit-priority" value="standard" class="peer sr-only"><div class="p-2.5 rounded-md border border-line peer-checked:border-ink peer-checked:bg-neutral-100 transition"><p class="text-xs font-bold text-ink">Standart (Tek Tık)</p></div></label>
+          </div>
+        </div>
+        <p id="edit-error" class="hidden text-xs text-red-600"></p>
+        <div class="pt-2 flex gap-2">
+          <button type="button" onclick="closeEditModal()" class="flex-1 py-2.5 text-xs font-semibold text-muted border border-line rounded-md hover:bg-paper">İptal</button>
+          <button type="submit" class="flex-1 py-2.5 text-xs font-semibold text-white bg-ink rounded-md hover:bg-neutral-800">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- FIREBASE ENTEGRASYONLU UYGULAMA MOTORU -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -417,6 +457,9 @@
     })();
     const SESSION_TTL = 14 * 24 * 60 * 60 * 1000; // 14 gün hiç açılmayan oturum geçersiz sayılır (telefon kaybı vb.)
 
+    const dateKeyOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    // Sonlandırılan doz (endedOn = son geçerli gün) o günden sonra görünmez
+    const isActiveOn = (r, key) => !r.endedOn || key <= r.endedOn;
     function getTodayKey() {
       const d = new Date();
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -518,7 +561,20 @@
       startSyncedApp();
     };
 
+    let joining = false;
+    window.onJoinCodeInput = (e) => {
+      const inp = e.target;
+      const d = inp.value.replace(/\D/g, '').slice(0, 6);
+      const deleting = !!(e.inputType && e.inputType.startsWith('delete'));
+      inp.value = d.length > 3 ? `${d.slice(0, 3)}-${d.slice(3)}` : (d.length === 3 && !deleting ? `${d}-` : d);
+      if (d.length === 6 && inp.form) inp.form.requestSubmit();
+    };
     window.joinExistingFamily = async (e) => {
+      if (joining) { e.preventDefault(); return; }
+      joining = true;
+      try { await joinExistingFamilyInner(e); } finally { joining = false; }
+    };
+    const joinExistingFamilyInner = async (e) => {
       e.preventDefault();
       const errEl = document.getElementById('onb-error');
       errEl.classList.add('hidden');
@@ -1082,7 +1138,8 @@
       let completedCount = 0;
       const isPast = selectedDateKey < todayKey; // geçmiş gün: yeni kayıt girilemez, geri alınamaz
 
-      routines.forEach(r => {
+      const visible = routines.filter(r => isActiveOn(r, selectedDateKey));
+      visible.forEach(r => {
         const entry = dayLogs[r.id];
         // Geçmişte kaydı olmayan kritik olmayan rutin otomatik "Bugün yok" sayılır (yazılmaz, sadece görünür)
         const autoSkipped = isPast && !entry && r.priority !== 'critical';
@@ -1104,8 +1161,7 @@
                 ${r.note ? `<p class="text-xs text-muted mt-0.5">${r.note}</p>` : ''}
               </div>
             </div>
-            ${editMode ? `<button onclick="deleteRoutine('${r.id}')" class="text-xs font-semibold text-red-600 hover:underline shrink-0">Sil</button>`
-              
+            ${editMode ? ''
               : (!isPast && entry && entry.by === currentProfile ? `<button onclick="undoAction('${r.id}')" class="text-[11px] font-medium text-muted hover:text-ink underline underline-offset-2 shrink-0">Geri al</button>` : '')}
           </div>`;
 
@@ -1124,13 +1180,23 @@
             : `<div class="mt-3.5 flex gap-2"><button onclick="recordAction('${r.id}', 'done')" class="flex-1 h-9 rounded-md bg-ink text-white text-xs font-semibold hover:bg-neutral-800 active:scale-[0.99] transition">Verildi Olarak İşaretle</button>${r.priority !== 'critical' ? `<button onclick="recordAction('${r.id}', 'skipped')" class="px-3 h-9 rounded-md border border-line bg-paper text-muted text-xs font-medium hover:text-ink transition">Bugün Yok</button>` : ''}</div>`;
         }
 
-        card.innerHTML = headerHtml + actionHtml;
+        const editRow = editMode ? `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center gap-5 text-xs font-semibold"><button onclick="openEditModal('${r.id}')" class="text-ink underline underline-offset-4">Düzenle</button><button onclick="endRoutine('${r.id}')" class="text-signal underline underline-offset-4">Dozu sonlandır</button><button onclick="deleteRoutine('${r.id}')" class="text-red-600 underline underline-offset-4 ml-auto">Sil</button></div>` : '';
+        card.innerHTML = headerHtml + actionHtml + editRow;
         listEl.appendChild(card);
         if (!entry && !isPast && !editMode && r.priority === 'critical') attachHoldMechanic(document.getElementById(`hold-${r.id}`), r.id);
       });
 
-      document.getElementById('progress-label').textContent = `${completedCount}/${routines.length}`;
-      document.getElementById('progress-fill').style.width = routines.length > 0 ? `${(completedCount / routines.length) * 100}%` : '0%';
+      if (editMode) {
+        const ended = routines.filter(r => r.endedOn && selectedDateKey > r.endedOn);
+        if (ended.length) {
+          const sec = document.createElement('div');
+          sec.className = 'pt-2';
+          sec.innerHTML = `<p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted mb-2">Sonlandırılanlar</p>` + ended.map(r => `<div class="bg-surface/70 rounded-lg border border-line p-3 mb-2 flex items-center justify-between gap-3"><div><p class="text-sm font-bold text-muted">${r.name}</p><p class="text-[11px] text-muted font-mono">${r.time} · ${r.endedOn} tarihine kadar</p></div><div class="flex items-center gap-4 text-xs font-semibold shrink-0"><button onclick="resumeRoutine('${r.id}')" class="text-ink underline underline-offset-4">Yeniden başlat</button><button onclick="deleteRoutine('${r.id}')" class="text-red-600 underline underline-offset-4">Sil</button></div></div>`).join('');
+          listEl.appendChild(sec);
+        }
+      }
+      document.getElementById('progress-label').textContent = `${completedCount}/${visible.length}`;
+      document.getElementById('progress-fill').style.width = visible.length > 0 ? `${(completedCount / visible.length) * 100}%` : '0%';
     }
 
     function renderHistory() {
@@ -1155,10 +1221,11 @@
         html += `<th class="text-center pb-2 px-1"><button onclick="jumpToDate('${d.key}')" class="hover:bg-paper rounded px-1 py-0.5"><span class="block font-mono text-[10px] text-muted">${d.dayShort}</span><span class="block font-mono text-[11px] font-semibold ${d.key === todayKey ? 'text-signal' : 'text-ink'}">${d.dayNum}</span></button></th>`;
       });
       html += `</tr></thead><tbody class="divide-y divide-line/60">`;
-      routines.forEach(r => {
+      routines.filter(r => !r.endedOn || days.some(d => d.key <= r.endedOn)).forEach(r => {
         html += `<tr><td class="${stickyCls} py-2.5 pl-4 pr-3 text-xs font-semibold text-ink whitespace-nowrap max-w-[130px] truncate">${r.name}</td>`;
         days.forEach(d => {
           const e = (logs[d.key] || {})[r.id];
+          if (!isActiveOn(r, d.key)) { html += `<td class="text-center py-2.5 px-1 text-muted/40 text-xs">–</td>`; return; }
           const dot = e?.status === 'done' ? `<span class="inline-block w-2.5 h-2.5 rounded-full bg-forest"></span>`
             : (e?.status === 'skipped' ? `<span class="inline-block w-2.5 h-2.5 rounded-full border border-muted"></span>`
             : `<span class="inline-block w-2.5 h-2.5 rounded-full bg-line"></span>`);
@@ -1295,6 +1362,53 @@
       editMode = !editMode;
       document.getElementById('btn-edit-mode').textContent = editMode ? 'Düzenlemeyi bitir' : 'Listeyi düzenle / sil';
       renderRoutine();
+    };
+    window.endRoutine = async (id) => {
+      const r = routines.find(x => x.id === id);
+      if (!r) return;
+      if (!confirm(`"${r.name}" sonlandırılsın mı?\n\nListeden kalkar ve hatırlatma gitmez. Geçmiş kayıtlar saklanır; "Yeniden başlat" ile geri açabilirsiniz.`)) return;
+      const today = getTodayKey();
+      // Bugün zaten verilmişse bugün dahil, verilmemişse dünden itibaren bitmiş sayılır
+      const y = new Date(); y.setDate(y.getDate() - 1);
+      const last = (logs[today] || {})[id] ? today : dateKeyOf(y);
+      await updateDoc(doc(db, 'families', familyCode), { routines: routines.map(x => x.id === id ? { ...x, endedOn: last } : x) });
+      showToast(`${r.name} sonlandırıldı`, 'TAMAM');
+    };
+    window.resumeRoutine = async (id) => {
+      await updateDoc(doc(db, 'families', familyCode), { routines: routines.map(x => { if (x.id !== id) return x; const { endedOn, ...rest } = x; return rest; }) });
+    };
+    let editingId = null;
+    window.openEditModal = (id) => {
+      const r = routines.find(x => x.id === id);
+      if (!r) return;
+      editingId = id;
+      document.getElementById('edit-name').value = r.name;
+      document.getElementById('edit-time').value = r.time;
+      document.getElementById('edit-note').value = r.note || '';
+      document.querySelector(`input[name="edit-priority"][value="${r.priority === 'critical' ? 'critical' : 'standard'}"]`).checked = true;
+      document.getElementById('edit-error').classList.add('hidden');
+      const m = document.getElementById('edit-modal'); m.classList.remove('hidden'); m.classList.add('flex');
+    };
+    window.closeEditModal = () => {
+      const m = document.getElementById('edit-modal'); m.classList.add('hidden'); m.classList.remove('flex');
+      editingId = null;
+    };
+    window.handleEditRoutine = async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('edit-name').value.trim();
+      const time = document.getElementById('edit-time').value.trim();
+      const note = document.getElementById('edit-note').value.trim();
+      const priority = document.querySelector('input[name="edit-priority"]:checked').value;
+      const err = document.getElementById('edit-error');
+      if (!/^\d{1,2}:\d{2}([–-]\d{1,2}:\d{2})?$/.test(time)) {
+        err.textContent = 'Saat 14:00 ya da 10:00-17:00 biçiminde yazılmalı.';
+        err.classList.remove('hidden');
+        return;
+      }
+      const updated = sortRoutines(routines.map(x => x.id === editingId ? { ...x, name, time, note, priority, allowSkip: priority !== 'critical' } : x));
+      await updateDoc(doc(db, 'families', familyCode), { routines: updated });
+      closeEditModal();
+      showToast('Doz güncellendi', 'TAMAM');
     };
     window.deleteRoutine = async (id) => {
       const updated = routines.filter(r => r.id !== id);

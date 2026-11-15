@@ -54,6 +54,7 @@ module.exports = async (req, res) => {
       const newReminders = {};
 
       for (const r of routines) {
+        if (r.endedOn && r.endedOn < dateKey) continue; // Sonlandırılan doz için hatırlatma yok
         if (dayLog[r.id]) continue; // Zaten verilmiş veya es geçilmişse dokunma!
 
         let slotToSend = null;
