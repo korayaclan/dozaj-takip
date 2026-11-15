@@ -553,7 +553,8 @@
       const btn = e.target.querySelector('button[type=submit]');
       btn.disabled = true;
       try {
-        await sendSignInLinkToEmail(auth, email, { url: location.origin + location.pathname, handleCodeInApp: true });
+        const q = familyCode ? `?fc=${encodeURIComponent(familyCode)}&pr=${encodeURIComponent(currentProfile)}&md=${isSolo ? 'solo' : 'family'}` : '';
+        await sendSignInLinkToEmail(auth, email, { url: location.origin + location.pathname + q, handleCodeInApp: true });
         localStorage.setItem('dozaj_email_pending', email);
         emailMsg(where, `Bağlantı ${email} adresine gönderildi. Postanızdan (gereksiz klasörüne de bakın) bağlantıya dokunun.`, true);
       } catch (err) {
@@ -577,6 +578,8 @@
     async function handleEmailLink() {
       if (!isSignInWithEmailLink(auth, location.href)) return false;
       const href = location.href;
+      const sp = new URLSearchParams(location.search);
+      const fromApp = sp.get('fc') ? { fc: sp.get('fc'), pr: sp.get('pr') || 'Anne', md: sp.get('md') } : null;
       history.replaceState(null, '', location.origin + location.pathname);
       let email = localStorage.getItem('dozaj_email_pending') || '';
       if (!email) email = (prompt('Giriş için e-posta adresinizi yazın:') || '').trim();
@@ -599,6 +602,18 @@
         }
       }
       localStorage.removeItem('dozaj_email_pending');
+      // Bağlantı, ailenin kurulu olduğu uygulamadan istendi ama başka tarayıcıda açıldı:
+      // hesabı o aileye bağla, bu tarayıcıda oturum açma (uygulamadaki oturum bozulmasın)
+      if (fromApp && !familyCode) {
+        try {
+          const fam = await getDoc(doc(db, 'families', fromApp.fc));
+          if (fam.exists()) {
+            await setDoc(doc(db, 'users', auth.currentUser.uid), { email: auth.currentUser.email, familyCode: fromApp.fc, profile: fromApp.pr, mode: fromApp.md === 'solo' ? 'solo' : 'family', updatedAt: Date.now() }, { merge: true });
+            try { sessionStorage.setItem('dozaj_ok', 'E-posta hesabınıza bağlandı. Dozaj uygulamasına dönebilirsiniz; yeni bir telefonda bu e-postayla giriş yapabilirsiniz.'); } catch (x) {}
+          }
+        } catch (err) { console.error(err); }
+        return false;
+      }
       if (linkedNow) { await saveUserDoc(); return false; }
       try {
         const u = await getDoc(doc(db, 'users', auth.currentUser.uid));
@@ -636,6 +651,9 @@
         document.getElementById('screen-onboarding').classList.remove('hidden');
         let msg = null;
         try { msg = sessionStorage.getItem('dozaj_msg'); sessionStorage.removeItem('dozaj_msg'); } catch (e) {}
+        let ok = null;
+        try { ok = sessionStorage.getItem('dozaj_ok'); sessionStorage.removeItem('dozaj_ok'); } catch (e) {}
+        if (ok) emailMsg('onb', ok, true);
         if (msg) {
           const errEl = document.getElementById('onb-error');
           errEl.textContent = msg; errEl.classList.remove('hidden');
