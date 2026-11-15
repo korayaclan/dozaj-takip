@@ -6,10 +6,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="theme-color" content="#F5F4F0" />
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
   <title>Dozaj — Günlük Takip</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -133,6 +133,7 @@
         </button>
       </form>
       <p id="onb-error" class="text-xs text-red-600 hidden"></p>
+      <button type="button" id="btn-takeover" onclick="takeOverSession()" class="hidden w-full py-2.5 border border-ink text-ink text-xs font-semibold rounded-md hover:bg-paper transition">Bu telefon geçsin, eski telefonu kapat</button>
     </div>
     <!-- Sosyal Bağlantılar -->
     <footer class="mt-8 flex items-center justify-center gap-5 text-muted">
@@ -484,6 +485,8 @@
     }
 
     let familyCode = localStorage.getItem('dozaj_family_code') || '';
+    // GitHub Pages yalnızca statik dosya sunar: /api/* (bildirim sunucusu) orada yoktur.
+    const API_ENABLED = !location.hostname.endsWith('github.io');
     let currentProfile = localStorage.getItem('dozaj_profile') || 'Anne';
     // Tek kullanıcı modu: aynı aile belgesi, tek profil ("Anne" olarak saklanır), ekranda "Sen"
     let isSolo = localStorage.getItem('dozaj_mode') === 'solo';
@@ -520,7 +523,7 @@
     async function boot() {
       await signInAnonymously(auth);
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(console.error);
+        navigator.serviceWorker.register('./firebase-messaging-sw.js').catch(console.error);
       }
       if (familyCode) {
         // Çevrimdışıysa oturum kontrolü yapılamaz; kullanıcıyı dışarıda bırakmamak için devam et.
@@ -539,14 +542,14 @@
     }
 
     // --- OTURUM KİLİDİ ---
-    async function claimSession(code, profile) {
+    async function claimSession(code, profile, force = false) {
       const ref = doc(db, 'families', code);
       return runTransaction(db, async (tx) => {
         const snap = await tx.get(ref);
         if (!snap.exists()) return { ok: true, missing: true };
         const s = (snap.data().sessions || {})[profile];
         const now = Date.now();
-        if (s && s.deviceId !== DEVICE_ID && now - (s.lastSeen || 0) < SESSION_TTL) return { ok: false, reason: 'busy' };
+        if (!force && s && s.deviceId !== DEVICE_ID && now - (s.lastSeen || 0) < SESSION_TTL) return { ok: false, reason: 'busy' };
         tx.update(ref, { [`sessions.${profile}`]: { deviceId: DEVICE_ID, lastSeen: now } });
         return { ok: true };
       });
@@ -627,6 +630,12 @@
     };
 
     let joining = false;
+    let forceTakeover = false;
+    window.takeOverSession = () => {
+      if (!confirm('Bu telefon esas telefon olsun mu?\n\nBu profilin eski telefondaki oturumu kapanır (tek seferde yalnızca bir telefon açık kalır).')) return;
+      forceTakeover = true;
+      document.getElementById('inp-join-code').form.requestSubmit();
+    };
     window.onJoinCodeInput = (e) => {
       const inp = e.target;
       const d = inp.value.replace(/\D/g, '').slice(0, 6);
@@ -655,7 +664,9 @@
       if (soloDoc) onboardingProfile = 'Anne';
       // Aynı aile kodunda aynı profil için ikinci oturum açılamaz.
       let claim;
-      try { claim = await claimSession(raw, onboardingProfile); }
+      document.getElementById('btn-takeover').classList.add('hidden');
+      const force = forceTakeover; forceTakeover = false;
+      try { claim = await claimSession(raw, onboardingProfile, force); }
       catch (err) {
         console.error(err);
         errEl.textContent = 'Bağlantı kurulamadı. İnternetinizi kontrol edip tekrar deneyin.';
@@ -664,8 +675,9 @@
       }
       if (!claim.ok) {
         const other = onboardingProfile === 'Anne' ? 'Baba' : 'Anne';
-        if (soloDoc) { errEl.textContent = 'Bu hesap başka bir telefonda açık. Eski telefonda "Bu telefondan çık" yapıp tekrar deneyin.'; errEl.classList.remove('hidden'); return; }
-        errEl.textContent = `Bu aile kodunda "${onboardingProfile}" zaten başka bir telefonda açık; ikinci ${onboardingProfile} oturumu açılamaz. Bu telefon ${other} ise ${other}'yı seçin. ${onboardingProfile} telefonunu değiştirdiyseniz eski telefonda "Aile kodundan çık" yapın.`;
+        document.getElementById('btn-takeover').classList.remove('hidden');
+        if (soloDoc) { errEl.textContent = 'Bu hesap başka bir telefonda açık. Eski telefonda "Bu telefondan çık" yapın ya da eski telefona erişemiyorsanız aşağıdaki düğmeyle bu telefonu esas yapın.'; errEl.classList.remove('hidden'); return; }
+        errEl.textContent = `Bu aile kodunda "${onboardingProfile}" zaten başka bir telefonda açık; ikinci ${onboardingProfile} oturumu açılamaz. Bu telefon ${other} ise ${other}'yı seçin. ${onboardingProfile} telefonunu değiştirdiyseniz eski telefonda "Aile kodundan çık" yapın ya da eskisine erişemiyorsanız aşağıdaki düğmeyle bu telefonu esas yapın.`;
         errEl.classList.remove('hidden');
         return;
       }
@@ -845,6 +857,7 @@
           return;
         }
 
+        if (!API_ENABLED) { add(false, 'Bildirim sunucusu', 'Bu sürüm GitHub Pages üzerinde; /api yok, bildirim gönderilemez'); return; }
         const res = await fetch('/api/test-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -879,6 +892,7 @@
       }, { merge: true });
 
       const partner = currentProfile === 'Anne' ? 'Baba' : 'Anne';
+      if (!API_ENABLED && !isSolo) { showToast(status === 'skipped' ? 'Es geçildi olarak kaydedildi' : `Kaydedildi: ${routine.name}`, nowTime); return; }
       if (isSolo) { showToast(status === 'skipped' ? 'Es geçildi olarak kaydedildi' : `Kaydedildi: ${routine.name}`, nowTime); return; }
       showToast(status === 'skipped' ? `${partner}'ya iletildi (Es geçildi)` : `${partner}'ya iletildi: ${routine.name}`, nowTime);
 
