@@ -136,7 +136,9 @@
       <button type="button" id="btn-takeover" onclick="takeOverSession()" class="hidden w-full py-2.5 border border-ink text-ink text-xs font-semibold rounded-md hover:bg-paper transition">Bu telefon geçsin, eski telefonu kapat</button>
     </div>
     <div class="mt-3 bg-surface border border-line rounded-xl p-4">
-      <p class="text-sm font-bold text-ink">E-postayla giriş</p>
+      <p class="text-sm font-bold text-ink">Hesapla giriş</p>
+      <button type="button" onclick="googleSignIn('onb')" class="mt-3 w-full py-2.5 border border-ink text-ink text-sm font-semibold rounded-md hover:bg-paper transition">Google ile giriş yap</button>
+      <p class="text-xs text-muted mt-3 leading-snug">Ya da e-postanıza bağlantı gönderin (günlük sınırı vardır).</p>
       <p class="text-xs text-muted mt-0.5 leading-snug">Daha önce e-posta eklediyseniz, kod hatırlamadan giriş yapın. Şifre yok; adresinize bir bağlantı gönderilir.</p>
       <form onsubmit="sendEmailLink(event,'onb')" class="mt-3 flex gap-2 min-w-0">
         <input id="inp-email-onb" type="email" autocomplete="email" required placeholder="ornek@mail.com" class="flex-1 min-w-0 w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
@@ -251,9 +253,11 @@
         <button onclick="addPartner()" class="mt-2 font-semibold text-ink underline underline-offset-4">Eş / aile ekle</button>
       </div>
       <div id="email-footer" class="mt-4 p-3 border border-line rounded-md bg-surface text-xs text-muted leading-relaxed">
-        <div id="email-linked" class="hidden">E-posta ile bağlı: <span id="email-linked-addr" class="font-semibold text-ink"></span>. Yeni telefonda e-postanızla şifresiz giriş yapabilirsiniz.</div>
+        <div id="email-linked" class="hidden">Hesap bağlı: <span id="email-linked-addr" class="font-semibold text-ink"></span>. Yeni telefonda bu hesapla giriş yapabilirsiniz.</div>
         <div id="email-add">
-          <p>E-posta ekleyin: telefonu kaybederseniz ya da değiştirirseniz kod aramadan giriş yaparsınız.</p>
+          <p>Hesabınızı bağlayın: telefonu kaybederseniz ya da değiştirirseniz kod aramadan giriş yaparsınız.</p>
+          <button type="button" onclick="googleSignIn('app')" class="mt-2 w-full py-2 border border-ink text-ink font-semibold rounded-md hover:bg-paper transition">Google ile bağla</button>
+          <p class="mt-3">Ya da e-posta bağlantısı:</p>
           <form onsubmit="sendEmailLink(event,'app')" class="mt-2 flex gap-2 min-w-0">
             <input id="inp-email-app" type="email" autocomplete="email" required placeholder="ornek@mail.com" class="flex-1 min-w-0 w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
             <button type="submit" class="shrink-0 px-3 py-2 bg-ink text-white font-semibold rounded-md">Bağlantı gönder</button>
@@ -426,7 +430,7 @@
   <!-- FIREBASE ENTEGRASYONLU UYGULAMA MOTORU -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, signInAnonymously, isSignInWithEmailLink, sendSignInLinkToEmail, signInWithEmailLink, EmailAuthProvider, linkWithCredential, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getAuth, signInAnonymously, isSignInWithEmailLink, sendSignInLinkToEmail, signInWithEmailLink, EmailAuthProvider, linkWithCredential, signOut, GoogleAuthProvider, signInWithPopup, linkWithPopup, signInWithCredential } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
     import { getFirestore, doc, collection, getDoc, setDoc, updateDoc, deleteField, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
@@ -635,6 +639,46 @@
       else { try { sessionStorage.setItem('dozaj_ok', auth.currentUser.email + ' ile giriş yapıldı ama bu e-posta henüz bir aileye bağlı değil. Aile kodunuzla bağlanın; e-posta otomatik eklenir.'); } catch (x) {} }
       return false;
     }
+
+    // --- GOOGLE İLE GİRİŞ ---
+    window.googleSignIn = async (where) => {
+      const provider = new GoogleAuthProvider();
+      try {
+        if (where === 'app' && auth.currentUser) {
+          try { await linkWithPopup(auth.currentUser, provider); }
+          catch (err) {
+            // Bu Google hesabı daha önce başka bir kayıtla kullanılmış: o hesaba geç, aileyi ona bağla
+            const cred = GoogleAuthProvider.credentialFromError(err);
+            if (err && err.code === 'auth/credential-already-in-use' && cred) await signInWithCredential(auth, cred);
+            else throw err;
+          }
+          await saveUserDoc(); refreshEmailUI();
+          emailMsg('app', 'Hesabınız Google ile bağlandı: ' + auth.currentUser.email, true);
+          return;
+        }
+        await signInWithPopup(auth, provider);
+        const u = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        if (u.exists() && u.data().familyCode) {
+          const d = u.data();
+          const fam = await getDoc(doc(db, 'families', d.familyCode));
+          if (fam.exists()) {
+            familyCode = d.familyCode; currentProfile = d.profile || 'Anne';
+            isSolo = d.mode === 'solo' || fam.data().mode === 'solo';
+            localStorage.setItem('dozaj_family_code', familyCode);
+            localStorage.setItem('dozaj_profile', currentProfile);
+            if (isSolo) localStorage.setItem('dozaj_mode', 'solo'); else localStorage.removeItem('dozaj_mode');
+            await claimSession(familyCode, currentProfile, true);
+            startSyncedApp();
+            return;
+          }
+        }
+        emailMsg('onb', auth.currentUser.email + ' ile giriş yapıldı ama bu hesap henüz bir aileye bağlı değil. Aile kodunuzla bağlanın; hesap otomatik eklenir.', true);
+      } catch (err) {
+        console.error(err);
+        if (err && err.code === 'auth/popup-closed-by-user') return;
+        emailMsg(where, 'Google ile giriş yapılamadı (' + (err && (err.code || err.message) || 'hata') + ').', false);
+      }
+    };
 
     async function boot() {
       if (auth.authStateReady) await auth.authStateReady();
