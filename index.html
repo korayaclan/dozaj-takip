@@ -70,6 +70,10 @@
   </style>
 </head>
 <body class="font-sans antialiased min-h-screen pb-20">
+  <div id="loading-overlay" class="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-paper/70 backdrop-blur-md" role="status" aria-live="polite">
+    <svg class="animate-spin h-8 w-8 text-ink" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".2" stroke-width="3"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+    <p id="loading-text" class="text-sm font-semibold text-ink">Bağlanıyor...</p>
+  </div>
 
   <!-- Şurup dolum katmanı (kritik doz basılı tutulurken ekranın altından yükselir) -->
   <canvas id="syrup-canvas" class="hidden fixed inset-0 w-full h-full z-40 pointer-events-none" aria-hidden="true"></canvas>
@@ -640,9 +644,14 @@
       return false;
     }
 
+    // Yükleme perdesi: bulanık arka plan + dönen ikon
+    function showLoading(t) { document.getElementById('loading-text').textContent = t || 'Bağlanıyor...'; document.getElementById('loading-overlay').classList.remove('hidden'); }
+    function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
+
     // --- GOOGLE İLE GİRİŞ ---
     window.googleSignIn = async (where) => {
       const provider = new GoogleAuthProvider();
+      showLoading('Google ile giriş yapılıyor...');
       try {
         if (where === 'app' && auth.currentUser) {
           try { await linkWithPopup(auth.currentUser, provider); }
@@ -677,7 +686,7 @@
         console.error(err);
         if (err && err.code === 'auth/popup-closed-by-user') return;
         emailMsg(where, 'Google ile giriş yapılamadı (' + (err && (err.code || err.message) || 'hata') + ').', false);
-      }
+      } finally { hideLoading(); }
     };
 
     async function boot() {
@@ -881,7 +890,7 @@
 
     // --- CANLI SENKRONİZASYON ---
     function startSyncedApp() {
-      refreshEmailUI(); saveUserDoc();
+      hideLoading(); refreshEmailUI(); saveUserDoc();
       document.getElementById('screen-onboarding').classList.add('hidden');
       document.getElementById('screen-app').classList.remove('hidden');
       document.getElementById('badge-code').textContent = familyCode;
@@ -1692,7 +1701,7 @@
     };
 
     window.switchTab('routine');
-    boot();
+    boot().catch((e) => console.error(e)).finally(hideLoading);
   </script>
 </body>
 </html>
