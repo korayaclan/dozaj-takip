@@ -93,16 +93,31 @@
   <div id="screen-onboarding" class="hidden max-w-md mx-auto px-4 pt-6 pb-4 sm:pt-12">
     <p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">BAŞLANGIÇ</p>
     <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-ink mt-0.5">Dozaj Takip</h1>
-    <p class="text-[13px] text-muted mt-1.5 leading-snug">
-      Şurup ve takviye dozlarınızı takip edin. Tek başınıza kullanabilir ya da eşinizle iki telefonda anlık senkronize edebilirsiniz.
-    </p>
+    <p class="text-[13px] text-muted mt-1.5 leading-snug">Doz takibi: tek başına ya da aileyle.</p>
 
-    <div class="mt-4 bg-surface border border-ink rounded-xl p-4">
-      <p class="text-sm font-bold text-ink">Tek başıma kullanacağım</p>
-      <p class="text-xs text-muted mt-0.5 leading-snug">Kayıtlar yalnızca sizin için tutulur. Eş ya da aile sonradan eklenebilir.</p>
-      <button onclick="createSoloAccount()" id="btn-create-solo" class="mt-3 w-full py-2.5 bg-ink text-white text-sm font-semibold rounded-md hover:bg-neutral-800 active:scale-[0.99] transition">
-        Başla
+    <div class="mt-4">
+      <button onclick="createSoloAccount()" id="btn-create-solo" class="w-full py-3 bg-ink text-white text-sm font-semibold rounded-xl hover:bg-neutral-800 active:scale-[0.99] transition">
+        Hemen başla
       </button>
+      <p class="text-[11px] text-muted mt-1.5 text-center">Sadece ben · eş sonradan eklenebilir</p>
+    </div>
+
+    <p class="mt-5 font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">HESABINLA GİRİŞ</p>
+    <div class="mt-2 bg-surface border border-line rounded-xl p-4 space-y-3">
+      <form onsubmit="sendEmailLink(event,'onb')" class="flex gap-2 min-w-0">
+        <label class="flex-1 min-w-0 flex items-center gap-2 px-3 bg-paper border border-line rounded-md focus-within:border-ink">
+          <svg class="h-4 w-4 text-muted shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+          <input id="inp-email-onb" type="email" autocomplete="email" required placeholder="E-posta adresi" class="flex-1 min-w-0 w-full py-2.5 text-sm bg-transparent focus:outline-none" />
+        </label>
+        <button type="submit" aria-label="E-posta bağlantısı gönder" class="shrink-0 px-4 bg-ink text-white rounded-md hover:bg-neutral-800 transition"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      </form>
+      <p id="email-msg-onb" class="text-xs hidden"></p>
+      <div class="relative flex items-center">
+        <div class="flex-grow border-t border-line"></div>
+        <span class="flex-shrink mx-3 text-[11px] font-mono text-muted uppercase">veya</span>
+        <div class="flex-grow border-t border-line"></div>
+      </div>
+      <button type="button" onclick="googleSignIn('onb')" class="w-full py-2.5 flex items-center justify-center gap-2 border border-line bg-surface text-ink text-sm font-semibold rounded-md hover:bg-paper transition"><svg class="h-4 w-4" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.1 1.4-4.9 2.3-8.2 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>Google ile devam et</button>
     </div>
 
     <p class="mt-5 font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">AİLE İLE PAYLAŞ</p>
@@ -138,17 +153,6 @@
       </form>
       <p id="onb-error" class="text-xs text-red-600 hidden"></p>
       <button type="button" id="btn-takeover" onclick="takeOverSession()" class="hidden w-full py-2.5 border border-ink text-ink text-xs font-semibold rounded-md hover:bg-paper transition">Bu telefon geçsin, eski telefonu kapat</button>
-    </div>
-    <div class="mt-3 bg-surface border border-line rounded-xl p-4">
-      <p class="text-sm font-bold text-ink">Hesapla giriş</p>
-      <button type="button" onclick="googleSignIn('onb')" class="mt-3 w-full py-2.5 border border-ink text-ink text-sm font-semibold rounded-md hover:bg-paper transition">Google ile giriş yap</button>
-      <p class="text-xs text-muted mt-3 leading-snug">Ya da e-postanıza bağlantı gönderin (günlük sınırı vardır).</p>
-      <p class="text-xs text-muted mt-0.5 leading-snug">Daha önce e-posta eklediyseniz, kod hatırlamadan giriş yapın. Şifre yok; adresinize bir bağlantı gönderilir.</p>
-      <form onsubmit="sendEmailLink(event,'onb')" class="mt-3 flex gap-2 min-w-0">
-        <input id="inp-email-onb" type="email" autocomplete="email" required placeholder="ornek@mail.com" class="flex-1 min-w-0 w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
-        <button type="submit" class="shrink-0 px-4 py-2 bg-ink text-white text-xs font-semibold rounded-md hover:bg-neutral-800 transition">Bağlantı gönder</button>
-      </form>
-      <p id="email-msg-onb" class="text-xs mt-2 hidden"></p>
     </div>
     <!-- Sosyal Bağlantılar -->
     <footer class="mt-5 flex items-center justify-center gap-5 text-muted">
@@ -257,16 +261,21 @@
         <button onclick="addPartner()" class="mt-2 font-semibold text-ink underline underline-offset-4">Eş / aile ekle</button>
       </div>
       <div id="email-footer" class="mt-4 p-3 border border-line rounded-md bg-surface text-xs text-muted leading-relaxed">
-        <div id="email-linked" class="hidden">Hesap bağlı: <span id="email-linked-addr" class="font-semibold text-ink"></span>. Yeni telefonda bu hesapla giriş yapabilirsiniz.</div>
-        <div id="email-add">
-          <p>Hesabınızı bağlayın: telefonu kaybederseniz ya da değiştirirseniz kod aramadan giriş yaparsınız.</p>
-          <button type="button" onclick="googleSignIn('app')" class="mt-2 w-full py-2 border border-ink text-ink font-semibold rounded-md hover:bg-paper transition">Google ile bağla</button>
-          <p class="mt-3">Ya da e-posta bağlantısı:</p>
-          <form onsubmit="sendEmailLink(event,'app')" class="mt-2 flex gap-2 min-w-0">
-            <input id="inp-email-app" type="email" autocomplete="email" required placeholder="ornek@mail.com" class="flex-1 min-w-0 w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
-            <button type="submit" class="shrink-0 px-3 py-2 bg-ink text-white font-semibold rounded-md">Bağlantı gönder</button>
-          </form>
-          <p id="email-msg-app" class="mt-2 hidden"></p>
+        <div id="email-linked" class="hidden"><div class="flex items-center gap-2">
+          <svg class="h-4 w-4 text-green-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>
+          <span>Hesap bağlı: <span id="email-linked-addr" class="font-semibold text-ink"></span></span>
+        </div></div>
+        <div id="email-add" class="space-y-2.5">
+          <p class="font-semibold text-ink">Hesabını bağla</p>
+          <form onsubmit="sendEmailLink(event,'app')" class="flex gap-2 min-w-0">
+        <label class="flex-1 min-w-0 flex items-center gap-2 px-3 bg-paper border border-line rounded-md focus-within:border-ink">
+          <svg class="h-4 w-4 text-muted shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+          <input id="inp-email-app" type="email" autocomplete="email" required placeholder="E-posta adresi" class="flex-1 min-w-0 w-full py-2.5 text-sm bg-transparent focus:outline-none" />
+        </label>
+        <button type="submit" aria-label="E-posta bağlantısı gönder" class="shrink-0 px-4 bg-ink text-white rounded-md hover:bg-neutral-800 transition"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      </form>
+          <p id="email-msg-app" class="hidden"></p>
+          <button type="button" onclick="googleSignIn('app')" class="w-full py-2.5 flex items-center justify-center gap-2 border border-line bg-surface text-ink text-sm font-semibold rounded-md hover:bg-paper transition"><svg class="h-4 w-4" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.1 1.4-4.9 2.3-8.2 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>Google ile bağla</button>
         </div>
       </div>
       <div class="mt-3 text-xs text-muted">
@@ -553,7 +562,7 @@
     function emailMsg(where, text, ok) {
       const el = document.getElementById('email-msg-' + where);
       if (!el) return;
-      el.textContent = text; el.className = (where === 'app' ? 'mt-2 ' : 'text-xs mt-2 ') + (ok ? 'text-green-700' : 'text-red-600');
+      el.textContent = text; el.className = (where === 'app' ? '' : 'text-xs ') + (ok ? 'text-green-700' : 'text-red-600');
     }
     window.sendEmailLink = async (e, where) => {
       e.preventDefault();
@@ -760,7 +769,7 @@
         });
       } catch (e) {
         console.error(e);
-        btn.disabled = false; btn.textContent = 'Başla';
+        btn.disabled = false; btn.textContent = 'Hemen başla';
         const errEl = document.getElementById('onb-error');
         errEl.textContent = 'Bağlantı kurulamadı. İnternetinizi kontrol edip tekrar deneyin.';
         errEl.classList.remove('hidden');
@@ -866,6 +875,7 @@
 
     window.leaveFamily = async () => {
       if (!confirm(isSolo ? `Bu telefondan çıkış yapılsın mı?\n\nKayıtlarınız silinmez; ${familyCode} koduyla tekrar giriş yapabilirsiniz.` : 'Bu cihazdaki aile kodundan çıkış yapılsın mı?')) return;
+      showLoading('Çıkış yapılıyor...');
       // Oturumu ve bildirim kaydını bırak ki bu profil başka telefonda açılabilsin.
       try {
         const ref = doc(db, 'families', familyCode);
