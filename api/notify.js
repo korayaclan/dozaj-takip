@@ -29,12 +29,14 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ok: true, skipped: 'Partner has no push token yet' });
     }
 
+    const names = famDoc.data().names || {};
+    const sender = names[senderProfile] || senderProfile;
     const title = status === 'skipped'
       ? `${routineName} es geçildi`
       : `${routineName} verildi`;
     const body = status === 'skipped'
-      ? `${senderProfile}, ${time} itibarıyla bugünlük es geçti.`
-      : `${senderProfile} tarafından ${time}'de onaylandı.`;
+      ? `${sender}, ${time} itibarıyla bugünlük es geçti.`
+      : `${sender} tarafından ${time}'de onaylandı.`;
 
     try {
     await admin.messaging().send({

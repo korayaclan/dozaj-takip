@@ -133,6 +133,14 @@
           <button type="button" onclick="selectOnboardingProfile('Anne')" id="onb-anne" class="py-2 text-sm font-semibold rounded-md border border-ink bg-ink text-white transition">Anne</button>
           <button type="button" onclick="selectOnboardingProfile('Baba')" id="onb-baba" class="py-2 text-sm font-semibold rounded-md border border-line bg-paper text-muted transition">Baba</button>
         </div>
+        <button type="button" onclick="toggleNameEdit()" id="btn-name-edit" class="mt-2 text-[11px] text-muted underline underline-offset-4 hover:text-ink transition">Adları değiştir</button>
+        <div id="name-edit" class="hidden mt-2">
+          <div class="grid grid-cols-2 gap-2">
+            <input id="inp-nm-a" maxlength="12" autocomplete="off" placeholder="Anne" oninput="onNameInput()" class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+            <input id="inp-nm-b" maxlength="12" autocomplete="off" placeholder="Baba" oninput="onNameInput()" class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+          </div>
+          <p class="text-[11px] text-muted mt-1.5">Örn. Ayşe / Mehmet ya da Kızım / Oğlum. Sonradan Ayarlar'dan da değişir.</p>
+        </div>
       </div>
 
       <div>
@@ -284,6 +292,7 @@
       <div class="mt-3 text-xs text-muted flex flex-wrap gap-x-5 gap-y-1">
         <button onclick="exportRecords()" class="hover:text-ink underline underline-offset-4 transition">Kayıtları indir (CSV)</button>
         <button onclick="toggleNotifTest()" class="hover:text-ink underline underline-offset-4 transition">Bildirimi test et</button>
+        <button onclick="editNames()" id="btn-edit-names" class="hidden hover:text-ink underline underline-offset-4 transition">Adları düzenle</button>
         <a href="gizlilik.html" class="hover:text-ink underline underline-offset-4 transition">Gizlilik</a>
       </div>
       <div id="notif-test" class="hidden mt-3 p-3 border border-line rounded-md bg-surface text-xs">
@@ -606,9 +615,22 @@
     let currentProfile = localStorage.getItem('dozaj_profile') || 'Anne';
     // Tek kullanıcı modu: aynı aile belgesi, tek profil ("Anne" olarak saklanır), ekranda "Sen"
     let isSolo = localStorage.getItem('dozaj_mode') === 'solo';
-    const whoText = (p) => (isSolo ? 'Sen' : p);
+    // Yuva anahtarları (Anne/Baba) veride sabit kalır; ekranda görünen adlar families/{kod}.names içinde tutulur.
+    let famNames = { Anne: 'Anne', Baba: 'Baba' };
+    const escHtml = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const cleanName = (v, fb) => (String(v || '').replace(/[<>&"']/g, '').trim().slice(0, 12)) || fb;
+    const nameOf = (p) => famNames[p] || p;
+    const setNames = (n) => { famNames = { Anne: cleanName(n && n.Anne, 'Anne'), Baba: cleanName(n && n.Baba, 'Baba') }; };
+    const customNames = () => (famNames.Anne !== 'Anne' || famNames.Baba !== 'Baba') ? { names: { Anne: famNames.Anne, Baba: famNames.Baba } } : {};
+    const whoText = (p) => (isSolo ? 'Sen' : nameOf(p));
+    function applyNamesUI() {
+      const a = document.getElementById('onb-anne'), b = document.getElementById('onb-baba');
+      if (a) a.textContent = famNames.Anne; if (b) b.textContent = famNames.Baba;
+      const bp = document.getElementById('badge-profile'); if (bp && familyCode) bp.textContent = isSolo ? 'Sen' : nameOf(currentProfile);
+    }
     function applySoloUI() {
-      document.getElementById('badge-profile').textContent = isSolo ? 'Sen' : currentProfile;
+      document.getElementById('badge-profile').textContent = isSolo ? 'Sen' : nameOf(currentProfile);
+      const ben = document.getElementById('btn-edit-names'); if (ben) ben.classList.toggle('hidden', isSolo);
       document.getElementById('solo-footer').classList.toggle('hidden', !isSolo);
       document.getElementById('solo-code').textContent = familyCode;
       document.getElementById('btn-test-partner').classList.toggle('hidden', isSolo);
@@ -772,6 +794,39 @@
         (inp || wrap.querySelector('#ui-dialog-ok')).focus();
       });
     }
+    // İki adı birlikte düzenleme penceresi
+    window.editNames = () => new Promise((resolve) => {
+      const wrap = document.createElement('div');
+      wrap.id = 'ui-dialog';
+      wrap.className = 'fixed inset-0 z-[110] flex items-center justify-center p-5 bg-ink/40 backdrop-blur-sm';
+      const cls = 'w-full px-3 py-2.5 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink';
+      wrap.innerHTML = `<div role="dialog" aria-modal="true" class="w-full max-w-sm bg-surface border border-line rounded-2xl shadow-xl p-5">
+        <h3 class="text-base font-bold text-ink leading-snug">Adları düzenle</h3>
+        <p class="text-sm text-muted mt-2 leading-relaxed">Kayıtlar ve geçmiş yeni adlarla görünür. En fazla 12 harf.</p>
+        <label class="block mt-3 text-xs font-semibold text-ink">Birinci kişi</label>
+        <input id="nm-a" maxlength="12" autocomplete="off" value="${escHtml(famNames.Anne)}" class="${cls} mt-1" />
+        <label class="block mt-3 text-xs font-semibold text-ink">İkinci kişi</label>
+        <input id="nm-b" maxlength="12" autocomplete="off" value="${escHtml(famNames.Baba)}" class="${cls} mt-1" />
+        <div class="mt-5 flex gap-2">
+          <button type="button" id="nm-cancel" class="flex-1 h-11 rounded-md border border-line bg-paper text-ink text-sm font-semibold hover:bg-white transition">Vazgeç</button>
+          <button type="button" id="nm-ok" class="flex-1 h-11 rounded-md bg-ink hover:bg-neutral-800 text-white text-sm font-semibold transition">Kaydet</button>
+        </div></div>`;
+      document.body.appendChild(wrap);
+      const close = () => { wrap.remove(); resolve(); };
+      wrap.querySelector('#nm-cancel').onclick = close;
+      wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+      wrap.querySelector('#nm-ok').onclick = async () => {
+        const a = cleanName(wrap.querySelector('#nm-a').value, 'Anne'), b = cleanName(wrap.querySelector('#nm-b').value, 'Baba');
+        if (a.toLowerCase() === b.toLowerCase()) { showToast('İki ad farklı olmalı', 'UYARI'); return; }
+        try {
+          await updateDoc(doc(db, 'families', familyCode), { names: { Anne: a, Baba: b } });
+          setNames({ Anne: a, Baba: b }); applyNamesUI(); if (activeTab === 'routine') renderRoutine();
+          showToast('Adlar kaydedildi', 'BİLGİ');
+        } catch (e) { console.error(e); showToast('Adlar kaydedilemedi', 'HATA'); }
+        close();
+      };
+      wrap.querySelector('#nm-a').focus();
+    });
     function showLoading(t) { document.getElementById('loading-text').textContent = t || 'Bağlanıyor...'; document.getElementById('loading-overlay').classList.remove('hidden'); }
     function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
 
@@ -865,6 +920,14 @@
     }
 
     // --- EŞLEŞTİRME FONKSİYONLARI ---
+    window.toggleNameEdit = () => {
+      const box = document.getElementById('name-edit'); box.classList.toggle('hidden');
+      if (!box.classList.contains('hidden')) document.getElementById('inp-nm-a').focus();
+    };
+    window.onNameInput = () => {
+      setNames({ Anne: document.getElementById('inp-nm-a').value, Baba: document.getElementById('inp-nm-b').value });
+      applyNamesUI();
+    };
     window.selectOnboardingProfile = (p) => {
       onboardingProfile = p;
       const onCls = 'py-2.5 text-sm font-semibold rounded-md border border-ink bg-ink text-white transition';
@@ -918,6 +981,7 @@
       const code = `${Math.floor(100 + Math.random() * 900)}-${Math.floor(100 + Math.random() * 900)}`;
       await setDoc(doc(db, 'families', code), {
         createdAt: Date.now(),
+        ...customNames(),
         routines: DEFAULT_ROUTINES,
         tokens: {},
         sessions: { [onboardingProfile]: { deviceId: DEVICE_ID, lastSeen: Date.now() } }
@@ -960,6 +1024,7 @@
         errEl.classList.remove('hidden');
         return;
       }
+      setNames(famSnap.data().names); applyNamesUI();
       // Tek kullanıcı hesabıysa profil seçimi gerekmez
       const soloDoc = famSnap.data().mode === 'solo';
       if (soloDoc) onboardingProfile = 'Anne';
@@ -978,7 +1043,7 @@
         const other = onboardingProfile === 'Anne' ? 'Baba' : 'Anne';
         document.getElementById('btn-takeover').classList.remove('hidden');
         if (soloDoc) { errEl.textContent = 'Bu hesap başka bir telefonda açık. Eski telefonda "Bu telefondan çık" yapın ya da eski telefona erişemiyorsanız aşağıdaki düğmeyle bu telefonu esas yapın.'; errEl.classList.remove('hidden'); return; }
-        errEl.textContent = `Bu aile kodunda "${onboardingProfile}" zaten başka bir telefonda açık; ikinci ${onboardingProfile} oturumu açılamaz. Bu telefon ${other} ise ${other}'yı seçin. ${onboardingProfile} telefonunu değiştirdiyseniz eski telefonda "Aile kodundan çık" yapın ya da eskisine erişemiyorsanız aşağıdaki düğmeyle bu telefonu esas yapın.`;
+        errEl.textContent = `Bu aile kodunda "${nameOf(onboardingProfile)}" zaten başka bir telefonda açık; ikinci ${nameOf(onboardingProfile)} oturumu açılamaz. Bu telefon ${nameOf(other)} ise ${nameOf(other)}'yı seçin. ${nameOf(onboardingProfile)} telefonunu değiştirdiyseniz eski telefonda "Aile kodundan çık" yapın ya da eskisine erişemiyorsanız aşağıdaki düğmeyle bu telefonu esas yapın.`;
         errEl.classList.remove('hidden');
         return;
       }
@@ -1046,6 +1111,7 @@
             if (s && s.deviceId !== DEVICE_ID && Date.now() - (s.lastSeen || 0) < SESSION_TTL) { kickOut(); return; }
             if (!s) claimSession(familyCode, currentProfile).catch(() => {});
           }
+          setNames(snap.data().names); applyNamesUI();
           const soloNow = snap.data().mode === 'solo';
           if (soloNow !== isSolo) { isSolo = soloNow; if (soloNow) localStorage.setItem('dozaj_mode', 'solo'); else localStorage.removeItem('dozaj_mode'); applySoloUI(); }
           routines = sortRoutines(snap.data().routines || DEFAULT_ROUTINES);
@@ -1132,8 +1198,8 @@
           const e = dl[r.id];
           if (!e) return;
           const status = e.status === 'skipped' ? 'Es geçildi' : 'Verildi';
-          if (r.asNeeded && e.doses && e.doses.length) e.doses.forEach(d => rows.push([day, r.groupName || r.name, r.time, status, isSolo ? '' : d.by, d.time]));
-          else rows.push([day, r.name, r.time, status, isSolo ? '' : e.by, e.time]);
+          if (r.asNeeded && e.doses && e.doses.length) e.doses.forEach(d => rows.push([day, r.groupName || r.name, r.time, status, isSolo ? '' : nameOf(d.by), d.time]));
+          else rows.push([day, r.name, r.time, status, isSolo ? '' : nameOf(e.by), e.time]);
         });
       });
       if (rows.length === 1) { showToast('İndirilecek kayıt yok', 'BİLGİ'); return; }
@@ -1234,7 +1300,7 @@
       const partner = currentProfile === 'Anne' ? 'Baba' : 'Anne';
       if (!API_ENABLED && !isSolo) { showToast(status === 'skipped' ? 'Es geçildi olarak kaydedildi' : `Kaydedildi: ${routine.name}`, nowTime); return; }
       if (isSolo) { showToast(status === 'skipped' ? 'Es geçildi olarak kaydedildi' : `Kaydedildi: ${routine.name}`, nowTime); return; }
-      showToast(status === 'skipped' ? `${partner}'ya iletildi (Es geçildi)` : `${partner}'ya iletildi: ${routine.name}`, nowTime);
+      showToast(status === 'skipped' ? `${nameOf(partner)}'ya iletildi (Es geçildi)` : `${nameOf(partner)}'ya iletildi: ${routine.name}`, nowTime);
 
       // Sunucu üzerinden karşı tarafa gerçek Push Bildirimi at
       fetch('/api/notify', {
@@ -1254,7 +1320,7 @@
             console.error('Bildirim API hatası:', res.status, j);
             showToast('Eşinize bildirim gönderilemedi', 'HATA');
           } else if (j.skipped) {
-            showToast(`${partner} henüz bildirimleri açmamış`, 'UYARI');
+            showToast(`${nameOf(partner)} henüz bildirimleri açmamış`, 'UYARI');
           }
         })
         .catch((err) => {
@@ -1680,7 +1746,7 @@
       const doneLine = (m, e) => {
         const skipped = e.status === 'skipped';
         const undo = (!isPast && !editMode && e.by === currentProfile) ? `<button onclick="undoAction('${m.id}')" class="text-[11px] font-medium text-muted hover:text-ink underline underline-offset-2">Geri al</button>` : '';
-        const who = skipped ? (isSolo ? 'es geçildi' : `${e.by} es geçti`) : (isSolo ? 'verildi' : `${e.by} verdi`);
+        const who = skipped ? (isSolo ? 'es geçildi' : `${escHtml(nameOf(e.by))} es geçti`) : (isSolo ? 'verildi' : `${escHtml(nameOf(e.by))} verdi`);
         const mark = skipped ? '<span class="text-muted">–</span>' : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>';
         return `<div class="flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold ${skipped ? 'text-muted' : 'text-forest'}">${mark}<span class="font-mono">${m.time}</span> ${who}</span><span class="flex items-center gap-3"><span class="font-mono text-muted">${e.time}</span>${undo}</span></div>`;
       };
@@ -1756,11 +1822,11 @@
             ? `<span class="font-semibold text-forest">${doses.length} kez verildi</span> <span class="font-mono">${doses.map(d => d.time).join(', ')}</span>`
             : (last ? `Son doz: ${agoText(last.ts)}${r.minHours ? ` · en az ${r.minHours} sa ara` : ''}` : (r.minHours ? `En az ${r.minHours} sa arayla` : 'Henüz verilmedi'));
           const btn = (!isPast && !editMode) ? `<button onclick="recordAction('${r.id}', 'done')" class="mt-2.5 w-full h-9 rounded-md bg-ink text-white text-xs font-semibold hover:bg-neutral-800 active:scale-[0.99] transition">${doses.length ? 'Bir doz daha' : 'Verdim'}</button>` : '';
-          actionHtml = `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs text-muted">${info}${doses.length && !isSolo ? ` <span>(${entry.by})</span>` : ''}${btn}</div>`;
+          actionHtml = `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs text-muted">${info}${doses.length && !isSolo ? ` <span>(${escHtml(nameOf(entry.by))})</span>` : ''}${btn}</div>`;
         } else if (entry) {
           actionHtml = isDone
-            ? `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold text-forest"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>${isSolo ? 'Verildi' : `${entry.by} tarafından verildi`}</span><span class="font-mono text-muted font-medium">${entry.time}</span></div>`
-            : `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs text-muted"><span>${isSolo ? 'Es geçildi' : `${entry.by} tarafından es geçildi`}</span><span class="font-mono">${entry.time}</span></div>`;
+            ? `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold text-forest"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>${isSolo ? 'Verildi' : `${escHtml(nameOf(entry.by))} tarafından verildi`}</span><span class="font-mono text-muted font-medium">${entry.time}</span></div>`
+            : `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs text-muted"><span>${isSolo ? 'Es geçildi' : `${escHtml(nameOf(entry.by))} tarafından es geçildi`}</span><span class="font-mono">${entry.time}</span></div>`;
         } else if (isPast) {
           actionHtml = `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs font-semibold text-signal">Verilmedi</div>`;
         } else if (!editMode) {
@@ -1855,7 +1921,7 @@
         let rows = entries.length === 0 ? `<p class="text-xs text-muted italic mt-1">Kayıt girilmemiş.</p>` : `<div class="mt-2 space-y-1.5">` + entries.map(({ routine, log, auto }) => `
           <div class="flex items-center justify-between text-xs"><span class="font-medium text-ink">${routine.name}</span>${auto
             ? `<span class="font-mono text-[11px] text-signal">Verilmedi</span>`
-            : `<span class="font-mono text-[11px] ${log.status === 'done' ? 'text-forest' : 'text-muted'}">${log.status === 'done' ? (routine.asNeeded && log.doses && log.doses.length > 1 ? `${log.doses.length} kez · ${log.time}` : (isSolo ? log.time : `${log.by} · ${log.time}`)) : (isSolo ? 'Es geçildi' : `Es geçildi (${log.by})`)}</span>`}</div>`).join('') + `</div>`;
+            : `<span class="font-mono text-[11px] ${log.status === 'done' ? 'text-forest' : 'text-muted'}">${log.status === 'done' ? (routine.asNeeded && log.doses && log.doses.length > 1 ? `${log.doses.length} kez · ${log.time}` : (isSolo ? log.time : `${escHtml(nameOf(log.by))} · ${log.time}`)) : (isSolo ? 'Es geçildi' : `Es geçildi (${escHtml(nameOf(log.by))})`)}</span>`}</div>`).join('') + `</div>`;
         card.innerHTML = `<div class="flex items-center justify-between border-b border-line/60 pb-2"><span class="text-xs font-bold text-ink">${d.fullLabel}</span><button onclick="jumpToDate('${d.key}')" class="font-mono text-[11px] text-muted hover:text-ink underline underline-offset-2">Güne git →</button></div>${rows}`;
         feedEl.appendChild(card);
       });

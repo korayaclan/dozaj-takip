@@ -16,10 +16,14 @@ service cloud.firestore {
       allow list: if false;
       allow create: if request.auth != null
         && code.matches('^[0-9]{3}-[0-9]{3}$')
-        && request.resource.data.keys().hasOnly(['createdAt', 'mode', 'routines', 'tokens', 'sessions']);
+        && request.resource.data.keys().hasOnly(['createdAt', 'mode', 'names', 'routines', 'tokens', 'sessions']);
       allow update: if request.auth != null
-        && request.resource.data.keys().hasOnly(['createdAt', 'mode', 'routines', 'tokens', 'sessions'])
-        && (!('routines' in request.resource.data) || request.resource.data.routines.size() <= 200);
+        && request.resource.data.keys().hasOnly(['createdAt', 'mode', 'names', 'routines', 'tokens', 'sessions'])
+        && (!('routines' in request.resource.data) || request.resource.data.routines.size() <= 200)
+        && (!('names' in request.resource.data) || (
+              request.resource.data.names.keys().hasOnly(['Anne', 'Baba'])
+              && request.resource.data.names.get('Anne', '').size() <= 12
+              && request.resource.data.names.get('Baba', '').size() <= 12));
       allow delete: if false;
 
       // Günlük kayıtlar (YYYY-MM-DD).
