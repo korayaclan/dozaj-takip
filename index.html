@@ -432,6 +432,17 @@
     let routines = DEFAULT_ROUTINES;
     let logs = {};
     let selectedDateKey = getTodayKey();
+    let lastTodayKey = selectedDateKey;
+    // Gece yarısı gün değişince: bugünü izliyorsa yeni güne geç, dünkü kartlar kilitlensin
+    function checkDayRollover() {
+      const nowKey = getTodayKey();
+      if (nowKey === lastTodayKey) return;
+      if (selectedDateKey === lastTodayKey) selectedDateKey = nowKey;
+      lastTodayKey = nowKey;
+      if (typeof renderRoutine === 'function' && document.getElementById('routine-list')) { renderRoutine(); renderHistory(); }
+    }
+    setInterval(checkDayRollover, 30000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkDayRollover(); });
     let activeTab = 'routine';
     let editMode = false;
     let unsubFamily = null;
@@ -721,6 +732,11 @@
 
     // --- KAYIT & EŞE BİLDİRİM ---
     window.recordAction = async (routineId, status) => {
+      if (selectedDateKey < getTodayKey()) {
+        showToast('Geçmiş güne kayıt girilemez', 'KİLİTLİ');
+        renderRoutine();
+        return;
+      }
       const routine = routines.find(r => r.id === routineId);
       const nowTime = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 
@@ -762,6 +778,11 @@
     };
 
     window.undoAction = async (routineId) => {
+      if (selectedDateKey < getTodayKey()) {
+        showToast('Geçmiş gün kayıtları değiştirilemez', 'KİLİTLİ');
+        renderRoutine();
+        return;
+      }
       // Kaydı kim girdiyse sadece o geri alabilir
       const entry = (logs[selectedDateKey] || {})[routineId];
       if (entry && entry.by !== currentProfile) {
@@ -1059,12 +1080,15 @@
       const listEl = document.getElementById('routine-list');
       listEl.innerHTML = '';
       let completedCount = 0;
+      const isPast = selectedDateKey < todayKey; // geçmiş gün: yeni kayıt girilemez, geri alınamaz
 
       routines.forEach(r => {
         const entry = dayLogs[r.id];
-        if (entry) completedCount++;
+        // Geçmişte kaydı olmayan kritik olmayan rutin otomatik "Bugün yok" sayılır (yazılmaz, sadece görünür)
+        const autoSkipped = isPast && !entry && r.priority !== 'critical';
+        if (entry || autoSkipped) completedCount++;
         const isDone = entry && entry.status === 'done';
-        const isSkipped = entry && entry.status === 'skipped';
+        const isSkipped = (entry && entry.status === 'skipped') || autoSkipped;
 
         const card = document.createElement('div');
         card.className = `bg-surface rounded-lg border transition-all p-4 ${isDone ? 'border-line bg-surface/70' : (r.priority === 'critical' && !entry ? 'border-ink/25 shadow-sm' : 'border-line')}`;
@@ -1081,7 +1105,8 @@
               </div>
             </div>
             ${editMode ? `<button onclick="deleteRoutine('${r.id}')" class="text-xs font-semibold text-red-600 hover:underline shrink-0">Sil</button>`
-              : (entry && entry.by === currentProfile ? `<button onclick="undoAction('${r.id}')" class="text-[11px] font-medium text-muted hover:text-ink underline underline-offset-2 shrink-0">Geri al</button>` : '')}
+              
+              : (!isPast && entry && entry.by === currentProfile ? `<button onclick="undoAction('${r.id}')" class="text-[11px] font-medium text-muted hover:text-ink underline underline-offset-2 shrink-0">Geri al</button>` : '')}
           </div>`;
 
         let actionHtml = '';
@@ -1089,6 +1114,10 @@
           actionHtml = isDone
             ? `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold text-forest"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>${entry.by} tarafından verildi</span><span class="font-mono text-muted font-medium">${entry.time}</span></div>`
             : `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs text-muted"><span>${entry.by} tarafından es geçildi</span><span class="font-mono">${entry.time}</span></div>`;
+        } else if (isPast) {
+          actionHtml = autoSkipped
+            ? `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs text-muted">Bugün yok (otomatik)</div>`
+            : `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs font-semibold text-signal">Verilmedi</div>`;
         } else if (!editMode) {
           actionHtml = r.priority === 'critical'
             ? `<div id="hold-${r.id}" class="mt-3.5 relative w-full h-11 rounded-md border border-signal/40 bg-signal/5 overflow-hidden no-select cursor-pointer touch-none" oncontextmenu="return false;"><div class="fill-layer syrup-fill absolute bottom-0 left-0 right-0 h-0 pointer-events-none"></div><div class="bubbles-layer absolute inset-0 overflow-hidden pointer-events-none"></div><div class="label-layer relative z-10 w-full h-full flex items-center justify-center font-mono text-[11px] font-semibold tracking-wider text-signal pointer-events-none">VERMEK İÇİN BASILI TUT</div></div>`
@@ -1097,7 +1126,7 @@
 
         card.innerHTML = headerHtml + actionHtml;
         listEl.appendChild(card);
-        if (!entry && !editMode && r.priority === 'critical') attachHoldMechanic(document.getElementById(`hold-${r.id}`), r.id);
+        if (!entry && !isPast && !editMode && r.priority === 'critical') attachHoldMechanic(document.getElementById(`hold-${r.id}`), r.id);
       });
 
       document.getElementById('progress-label').textContent = `${completedCount}/${routines.length}`;
