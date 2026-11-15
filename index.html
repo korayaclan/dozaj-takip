@@ -38,6 +38,10 @@
   </script>
   <style>
     body { background-color: #F5F4F0; color: #141413; -webkit-tap-highlight-color: transparent; }
+    /* Uygulama hissi: metinler seçilmez, uzun basınca seçim/arama çubuğu çıkmaz. Yazı kutuları hariç. */
+    body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    input, textarea { -webkit-user-select: text; user-select: text; }
+    img, a { -webkit-user-drag: none; }
     .no-select { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     @keyframes bubble-rise {
       0% { transform: translateY(0) scale(0.5); opacity: 0; }
