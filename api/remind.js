@@ -55,6 +55,12 @@ module.exports = async (req, res) => {
 
       for (const r of routines) {
         if (r.endedOn && r.endedOn < dateKey) continue; // Sonlandırılan doz için hatırlatma yok
+        if (r.asNeeded) continue; // "Gerektiğinde" dozların saati yok, hatırlatma gitmez
+        if (r.courseDays && r.startedOn) {
+          // Kür süresi bitti ya da henüz başlamadı
+          const end = new Date(r.startedOn + 'T00:00:00Z'); end.setUTCDate(end.getUTCDate() + r.courseDays - 1);
+          if (dateKey > end.toISOString().slice(0, 10) || dateKey < r.startedOn) continue;
+        }
         if (dayLog[r.id]) continue; // Zaten verilmiş veya es geçilmişse dokunma!
 
         let slotToSend = null;

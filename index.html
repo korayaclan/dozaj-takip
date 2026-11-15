@@ -334,8 +334,12 @@
           <input id="inp-name" type="text" required placeholder="Örn: D Vitamini" oninput="refreshDoseTimes()"
             class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
         </div>
+        <div>
+          <label class="block text-xs font-semibold text-ink mb-1.5">Simge</label>
+          <div id="icon-picker-add" class="flex flex-wrap gap-1.5"></div>
+        </div>
         <div class="grid grid-cols-2 gap-3">
-          <div>
+          <div id="grp-time">
             <label class="block text-xs font-semibold text-ink mb-1">Saat / Aralık</label>
             <input id="inp-time" type="text" required placeholder="14:00 veya 10:00-17:00" oninput="refreshDoseTimes()"
               class="w-full px-3 py-2 text-sm font-mono bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
@@ -346,7 +350,7 @@
               class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
           </div>
         </div>
-        <div>
+        <div id="grp-doses">
           <label class="block text-xs font-semibold text-ink mb-1.5">Günde kaç doz?</label>
           <div class="grid grid-cols-4 gap-2">
             <label class="cursor-pointer">
@@ -373,7 +377,22 @@
             <p id="dose-error" class="hidden mt-1.5 text-xs text-red-600"></p>
           </div>
         </div>
-        <div>
+        <details class="rounded-md border border-line bg-paper">
+          <summary class="px-3 py-2.5 text-xs font-semibold text-ink cursor-pointer">Daha fazla seçenek</summary>
+          <div class="px-3 pb-3 space-y-3">
+            <label class="flex items-start gap-2 text-xs text-ink"><input type="checkbox" id="inp-prn" onchange="togglePrn()" class="mt-0.5"><span><span class="font-semibold">Gerektiğinde kullanılır</span><br><span class="text-muted">Saati yok; ateş düşürücü gibi, ihtiyaç olunca "Verdim" dersin.</span></span></label>
+            <div id="prn-box" class="hidden">
+              <label class="block text-xs font-semibold text-ink mb-1">En az kaç saat arayla?</label>
+              <input id="inp-minh" type="number" min="1" max="48" inputmode="numeric" placeholder="Örn: 6" class="w-full px-3 py-2 text-sm bg-surface border border-line rounded-md focus:outline-none focus:border-ink" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-ink mb-1">Kaç gün kullanılacak? <span class="font-normal text-muted">(isteğe bağlı)</span></label>
+              <input id="inp-days" type="number" min="1" max="365" inputmode="numeric" placeholder="Örn: 7" class="w-full px-3 py-2 text-sm bg-surface border border-line rounded-md focus:outline-none focus:border-ink" />
+              <p class="text-[11px] text-muted mt-1">Süre dolunca doz kendiliğinden biter.</p>
+            </div>
+          </div>
+        </details>
+        <div id="grp-priority">
           <label class="block text-xs font-semibold text-ink mb-1.5">Onay Tipi</label>
           <div class="grid grid-cols-2 gap-2">
             <label class="cursor-pointer">
@@ -414,8 +433,12 @@
           <label class="block text-xs font-semibold text-ink mb-1">Şurup / Takviye Adı</label>
           <input id="edit-name" type="text" required class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
         </div>
+        <div>
+          <label class="block text-xs font-semibold text-ink mb-1.5">Simge</label>
+          <div id="icon-picker-edit" class="flex flex-wrap gap-1.5"></div>
+        </div>
         <div class="grid grid-cols-2 gap-3">
-          <div>
+          <div id="edit-grp-time">
             <label class="block text-xs font-semibold text-ink mb-1">Saat / Aralık</label>
             <input id="edit-time" type="text" required placeholder="14:00 veya 10:00-17:00" class="w-full px-3 py-2 text-sm font-mono bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
           </div>
@@ -424,7 +447,15 @@
             <input id="edit-note" type="text" placeholder="Örn: 1 ölçek" class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
           </div>
         </div>
+        <div id="edit-prn-box" class="hidden">
+          <label class="block text-xs font-semibold text-ink mb-1">En az kaç saat arayla?</label>
+          <input id="edit-minh" type="number" min="1" max="48" inputmode="numeric" placeholder="Örn: 6" class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+        </div>
         <div>
+          <label class="block text-xs font-semibold text-ink mb-1">Kaç gün kullanılacak? <span class="font-normal text-muted">(isteğe bağlı)</span></label>
+          <input id="edit-days" type="number" min="1" max="365" inputmode="numeric" placeholder="Boş = süresiz" class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+        </div>
+        <div id="edit-grp-priority">
           <label class="block text-xs font-semibold text-ink mb-1.5">Onay Tipi</label>
           <div class="grid grid-cols-2 gap-2">
             <label class="cursor-pointer"><input type="radio" name="edit-priority" value="critical" class="peer sr-only"><div class="p-2.5 rounded-md border border-line peer-checked:border-signal peer-checked:bg-signal/5 transition"><p class="text-xs font-bold text-ink">Kritik (Basılı Tut)</p></div></label>
@@ -480,10 +511,10 @@
     }
 
     const DEFAULT_ROUTINES = [
-      { id: 'r_syrup_am', name: 'Sabah Şurubu', time: '07:45', note: 'Kritik doz', priority: 'critical' },
-      { id: 'r_ravla', name: 'Ravla Zeytinyağı', time: '08:00', note: 'Her gün', priority: 'standard', allowSkip: false },
-      { id: 'r_mollers', name: "Möller's Balık Yağı", time: '10:00–17:00', note: '', priority: 'standard', allowSkip: true },
-      { id: 'r_syrup_pm', name: 'Akşam Şurubu', time: '19:45', note: 'Kritik doz', priority: 'critical' }
+      { id: 'r_syrup_am', name: 'Sabah Şurubu', time: '07:45', note: 'Kritik doz', priority: 'critical', icon: 'syrup' },
+      { id: 'r_ravla', name: 'Ravla Zeytinyağı', time: '08:00', note: 'Her gün', priority: 'standard', allowSkip: false, icon: 'drop' },
+      { id: 'r_mollers', name: "Möller's Balık Yağı", time: '10:00–17:00', note: '', priority: 'standard', allowSkip: true, icon: 'capsule' },
+      { id: 'r_syrup_pm', name: 'Akşam Şurubu', time: '19:45', note: 'Kritik doz', priority: 'critical', icon: 'syrup' }
     ];
 
     // Rutinleri başlangıç saatine göre sırala. Aynı saatte tek saatli rutin, saat aralığından önce gelir.
@@ -511,7 +542,49 @@
 
     const dateKeyOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     // Sonlandırılan doz (endedOn = son geçerli gün) o günden sonra görünmez
-    const isActiveOn = (r, key) => !r.endedOn || key <= r.endedOn;
+    // Kür: courseDays + startedOn varsa son gün otomatik hesaplanır; endedOn ile hangisi önceyse o geçerli
+    const addDaysKey = (key, n) => { const d = parseDateKey(key); d.setDate(d.getDate() + n); return dateKeyOf(d); };
+    const lastDayOf = (r) => {
+      const c = (r.courseDays && r.startedOn) ? addDaysKey(r.startedOn, r.courseDays - 1) : null;
+      return [r.endedOn, c].filter(Boolean).sort()[0] || null;
+    };
+    const isActiveOn = (r, key) => { const l = lastDayOf(r); return (!l || key <= l) && !(r.courseDays && r.startedOn && key < r.startedOn); };
+    const dayNumberOf = (r, key) => Math.round((parseDateKey(key) - parseDateKey(r.startedOn)) / 86400000) + 1;
+    // --- İKONLAR ---
+    const ICON_SVG = {
+      syrup: '<path d="M9 3h6M10 3v3l-2 3v10a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V9l-2-3V3"/><path d="M8 13h8"/>',
+      tablet: '<circle cx="12" cy="12" r="8"/><path d="M8.5 12h7"/>',
+      capsule: '<path d="M10.5 20.5a4.95 4.95 0 0 1-7-7l10-10a4.95 4.95 0 0 1 7 7z"/><path d="m8.5 8.5 7 7"/>',
+      drop: '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',
+      vitamin: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>',
+      powder: '<path d="M6 3h12v18H6z"/><path d="M6 7h12M9.5 12h5M9.5 15h5"/>',
+      cream: '<path d="M8 3h8l1 4H7zM7 7h10l-1.2 14H8.2z"/>',
+      spray: '<path d="M8 10h8v11H8zM10 10V6h4v4M14 7h4M17 4.5l2-1M17 9.5l2 1"/>',
+      injection: '<path d="m18 2 4 4M17 7l3-3M19 9 8.7 19.3a2 2 0 0 1-2.8 0l-1.2-1.2a2 2 0 0 1 0-2.8L15 5M14 8l2 2M11 11l2 2M8 14l2 2"/>'
+    };
+    const ICON_LABEL = { syrup: 'Şurup', tablet: 'Tablet', capsule: 'Kapsül', drop: 'Damla', vitamin: 'Vitamin', powder: 'Saşe', cream: 'Krem', spray: 'Sprey', injection: 'İğne' };
+    const iconGuess = (name) => /şurup|surup/i.test(name || '') ? 'syrup' : /yağ|yag|damla/i.test(name || '') ? 'drop' : /vitamin/i.test(name || '') ? 'vitamin' : 'capsule';
+    const iconKey = (r) => (r.icon && ICON_SVG[r.icon]) ? r.icon : iconGuess(r.name);
+    const iconSvg = (k, cls) => `<svg class="${cls || 'w-4 h-4'}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_SVG[k]}</svg>`;
+    function buildIconPicker(elId, groupName, selected) {
+      document.getElementById(elId).innerHTML = Object.keys(ICON_SVG).map(k => `<label class="cursor-pointer" title="${ICON_LABEL[k]}"><input type="radio" name="${groupName}" value="${k}" class="peer sr-only" ${k === selected ? 'checked' : ''}><div class="w-10 h-10 flex items-center justify-center rounded-md border border-line text-muted peer-checked:border-ink peer-checked:bg-ink peer-checked:text-white transition">${iconSvg(k, 'w-5 h-5')}</div></label>`).join('');
+    }
+    const pickedIcon = (groupName) => { const el = document.querySelector(`input[name="${groupName}"]:checked`); return el ? el.value : null; };
+    // "Gerektiğinde" dozlar: kayıtta doses[] listesi tutulur
+    function lastPrnDose(id) {
+      let best = null;
+      Object.values(logs).forEach(day => { const e = day && day[id]; if (e && e.doses) e.doses.forEach(d => { if (d.ts && (!best || d.ts > best.ts)) best = d; }); });
+      return best;
+    }
+    function agoText(ts) {
+      const m = Math.max(0, Math.round((Date.now() - ts) / 60000));
+      if (m < 1) return 'az önce';
+      if (m < 60) return `${m} dk önce`;
+      const h = Math.floor(m / 60);
+      if (h < 24) return `${h} sa${m % 60 ? ' ' + (m % 60) + ' dk' : ''} önce`;
+      const dd = Math.floor(h / 24);
+      return dd === 1 ? 'dün' : `${dd} gün önce`;
+    }
     function getTodayKey() {
       const d = new Date();
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -549,10 +622,12 @@
     }
     const lockSig = () => routines.filter(isTimeLocked).map(r => r.id).join(',');
     let lastLockSig = '';
+    let lastPrnRender = 0;
     function checkDayRollover() {
       const nowKey = getTodayKey();
       if (nowKey === lastTodayKey) {
-        if (lockSig() !== lastLockSig && document.getElementById('routine-list')) renderRoutine();
+        const prnTick = routines.some(r => r.asNeeded) && Date.now() - lastPrnRender > 55000;
+        if ((lockSig() !== lastLockSig || prnTick) && document.getElementById('routine-list') && activeTab === 'routine') renderRoutine();
         return;
       }
       if (selectedDateKey === lastTodayKey) selectedDateKey = nowKey;
@@ -1079,12 +1154,24 @@
       const routine = routines.find(r => r.id === routineId);
       if (routine && isTimeLocked(routine)) { showToast(`Bu doz ${routine.time.split('–')[0]} saatinde açılır`, 'HENÜZ DEĞİL'); renderRoutine(); return; }
       const nowTime = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+      const payload = { status, by: currentProfile, time: nowTime };
+      if (routine && routine.asNeeded) {
+        payload.status = status = 'done';
+        const last = lastPrnDose(routine.id);
+        if (routine.minHours && last && Date.now() - last.ts < routine.minHours * 3600000) {
+          if (!confirm(`Son doz ${agoText(last.ts)} verildi; en az ${routine.minHours} saat ara önerilmişti.\n\nYine de verilsin mi?`)) return;
+        }
+        const prev = (logs[selectedDateKey] || {})[routine.id];
+        const doses = prev ? (prev.doses ? prev.doses.slice() : [{ by: prev.by, time: prev.time }]) : [];
+        doses.push({ by: currentProfile, time: nowTime, ts: Date.now() });
+        payload.doses = doses;
+      }
 
       if (navigator.vibrate) navigator.vibrate([30, 20, 50]);
       playConfirmTone();
 
       await setDoc(doc(db, 'families', familyCode, 'logs', selectedDateKey), {
-        [routineId]: { status, by: currentProfile, time: nowTime }
+        [routineId]: payload
       }, { merge: true });
 
       const partner = currentProfile === 'Anne' ? 'Baba' : 'Anne';
@@ -1129,6 +1216,12 @@
       const entry = (logs[selectedDateKey] || {})[routineId];
       if (entry && entry.by !== currentProfile) {
         showToast(`Bunu sadece ${whoText(entry.by)} geri alabilir`, 'İZİN YOK');
+        return;
+      }
+      if (entry && entry.doses && entry.doses.length > 1) {
+        // Gerektiğinde dozlarda yalnızca son doz geri alınır
+        const doses = entry.doses.slice(0, -1); const prevD = doses[doses.length - 1];
+        await setDoc(doc(db, 'families', familyCode, 'logs', selectedDateKey), { [routineId]: { status: 'done', by: prevD.by, time: prevD.time, doses } }, { merge: true });
         return;
       }
       await updateDoc(doc(db, 'families', familyCode, 'logs', selectedDateKey), {
@@ -1425,12 +1518,13 @@
       const isPast = selectedDateKey < todayKey; // geçmiş gün: yeni kayıt girilemez, geri alınamaz
 
       lastLockSig = lockSig();
-      const visible = routines.filter(r => isActiveOn(r, selectedDateKey));
+      lastPrnRender = Date.now();
+      const visible = routines.filter(r => isActiveOn(r, selectedDateKey) && !(r.asNeeded && isPast && !dayLogs[r.id]));
       visible.forEach(r => {
         const entry = dayLogs[r.id];
         // Geçmişte kaydı olmayan kritik olmayan rutin otomatik "Bugün yok" sayılır (yazılmaz, sadece görünür)
-        const autoSkipped = isPast && !entry && r.priority !== 'critical';
-        if (entry || autoSkipped) completedCount++;
+        const autoSkipped = isPast && !entry && r.priority !== 'critical' && !r.asNeeded;
+        if (!r.asNeeded && (entry || autoSkipped)) completedCount++;
         const isDone = entry && entry.status === 'done';
         const isSkipped = (entry && entry.status === 'skipped') || autoSkipped;
 
@@ -1444,8 +1538,8 @@
                 <span class="inline-block font-mono text-xs font-semibold px-2 py-0.5 rounded ${isDone ? 'bg-emerald-50 text-forest' : (r.priority === 'critical' ? 'bg-signal/10 text-signal' : 'bg-paper text-ink')}">${r.time}</span>
               </div>
               <div>
-                <h3 class="text-sm font-bold ${isDone || isSkipped ? 'text-muted line-through decoration-muted/50' : 'text-ink'}">${r.name}</h3>
-                ${r.note && r.note !== 'Esnek pencere' ? `<p class="text-xs text-muted mt-0.5">${r.note}</p>` : ''}
+                <h3 class="text-sm font-bold flex items-center gap-1.5 ${isDone && !r.asNeeded || isSkipped ? 'text-muted line-through decoration-muted/50' : 'text-ink'}"><span class="text-muted shrink-0">${iconSvg(iconKey(r), 'w-4 h-4')}</span><span>${r.name}</span></h3>
+                ${(() => { const meta = [r.note && r.note !== 'Esnek pencere' ? r.note : '', (r.courseDays && r.startedOn) ? `${Math.min(dayNumberOf(r, selectedDateKey), r.courseDays)}. gün / ${r.courseDays}` : ''].filter(Boolean).join(' · '); return meta ? `<p class="text-xs text-muted mt-0.5">${meta}</p>` : ''; })()}
               </div>
             </div>
             ${editMode ? ''
@@ -1453,7 +1547,15 @@
           </div>`;
 
         let actionHtml = '';
-        if (entry) {
+        if (r.asNeeded) {
+          const doses = entry ? (entry.doses && entry.doses.length ? entry.doses : [{ by: entry.by, time: entry.time }]) : [];
+          const last = lastPrnDose(r.id);
+          const info = doses.length
+            ? `<span class="font-semibold text-forest">${doses.length} kez verildi</span> <span class="font-mono">${doses.map(d => d.time).join(', ')}</span>`
+            : (last ? `Son doz: ${agoText(last.ts)}${r.minHours ? ` · en az ${r.minHours} sa ara` : ''}` : (r.minHours ? `En az ${r.minHours} sa arayla` : 'Henüz verilmedi'));
+          const btn = (!isPast && !editMode) ? `<button onclick="recordAction('${r.id}', 'done')" class="mt-2.5 w-full h-9 rounded-md bg-ink text-white text-xs font-semibold hover:bg-neutral-800 active:scale-[0.99] transition">${doses.length ? 'Bir doz daha' : 'Verdim'}</button>` : '';
+          actionHtml = `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs text-muted">${info}${doses.length && !isSolo ? ` <span>(${entry.by})</span>` : ''}${btn}</div>`;
+        } else if (entry) {
           actionHtml = isDone
             ? `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold text-forest"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>${isSolo ? 'Verildi' : `${entry.by} tarafından verildi`}</span><span class="font-mono text-muted font-medium">${entry.time}</span></div>`
             : `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs text-muted"><span>${isSolo ? 'Es geçildi' : `${entry.by} tarafından es geçildi`}</span><span class="font-mono">${entry.time}</span></div>`;
@@ -1473,23 +1575,24 @@
         if (!entry && !isPast && !editMode && r.priority === 'critical' && !isTimeLocked(r)) attachHoldMechanic(document.getElementById(`hold-${r.id}`), r.id);
       });
 
-      if (visible.length === 0 && !editMode) {
+      if (visible.length === 0 && !editMode && !routines.some(r => r.asNeeded && !isPast)) {
         const empty = document.createElement('div');
         empty.className = 'bg-surface rounded-lg border border-dashed border-line p-6 text-center';
         empty.innerHTML = `<p class="text-sm font-bold text-ink">Henüz doz eklenmedi</p><p class="text-xs text-muted mt-1 leading-relaxed">Sağ üstteki <strong>Ekle</strong> düğmesiyle ilk şurup ya da takviyeni ekle.</p>`;
         listEl.appendChild(empty);
       }
       if (editMode) {
-        const ended = routines.filter(r => r.endedOn && selectedDateKey > r.endedOn);
+        const ended = routines.filter(r => lastDayOf(r) && selectedDateKey > lastDayOf(r));
         if (ended.length) {
           const sec = document.createElement('div');
           sec.className = 'pt-2';
-          sec.innerHTML = `<p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted mb-2">Sonlandırılanlar</p>` + ended.map(r => `<div class="bg-surface/70 rounded-lg border border-line p-3 mb-2 flex items-center justify-between gap-3"><div><p class="text-sm font-bold text-muted">${r.name}</p><p class="text-[11px] text-muted font-mono">${r.time} · ${r.endedOn} tarihine kadar</p></div><div class="flex items-center gap-4 text-xs font-semibold shrink-0"><button onclick="resumeRoutine('${r.id}')" class="text-ink underline underline-offset-4">Yeniden başlat</button><button onclick="deleteRoutine('${r.id}')" class="text-red-600 underline underline-offset-4">Sil</button></div></div>`).join('');
+          sec.innerHTML = `<p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted mb-2">Sonlandırılanlar</p>` + ended.map(r => `<div class="bg-surface/70 rounded-lg border border-line p-3 mb-2 flex items-center justify-between gap-3"><div><p class="text-sm font-bold text-muted">${r.name}</p><p class="text-[11px] text-muted font-mono">${r.time} · ${lastDayOf(r)} tarihine kadar</p></div><div class="flex items-center gap-4 text-xs font-semibold shrink-0"><button onclick="resumeRoutine('${r.id}')" class="text-ink underline underline-offset-4">Yeniden başlat</button><button onclick="deleteRoutine('${r.id}')" class="text-red-600 underline underline-offset-4">Sil</button></div></div>`).join('');
           listEl.appendChild(sec);
         }
       }
-      document.getElementById('progress-label').textContent = `${completedCount}/${visible.length}`;
-      document.getElementById('progress-fill').style.width = visible.length > 0 ? `${(completedCount / visible.length) * 100}%` : '0%';
+      const countable = visible.filter(r => !r.asNeeded).length;
+      document.getElementById('progress-label').textContent = `${completedCount}/${countable}`;
+      document.getElementById('progress-fill').style.width = countable > 0 ? `${(completedCount / countable) * 100}%` : '0%';
     }
 
     function renderHistory() {
@@ -1521,11 +1624,11 @@
         html += `<th class="text-center pb-2 px-1"><button onclick="jumpToDate('${d.key}')" class="hover:bg-paper rounded px-1 py-0.5"><span class="block font-mono text-[10px] text-muted">${d.dayShort}</span><span class="block font-mono text-[11px] font-semibold ${d.key === todayKey ? 'text-signal' : 'text-ink'}">${d.dayNum}</span>${spans && d.dayNum === 1 ? `<span class="block font-mono text-[9px] text-muted">${parseDateKey(d.key).toLocaleDateString('tr-TR', { month: 'short' })}</span>` : ''}</button></th>`;
       });
       html += `</tr></thead><tbody class="divide-y divide-line/60">`;
-      routines.filter(r => !r.endedOn || days.some(d => d.key <= r.endedOn)).forEach(r => {
-        html += `<tr><td class="${stickyCls} py-2.5 pl-4 pr-3 text-xs font-semibold text-ink whitespace-nowrap max-w-[130px] truncate">${r.name}</td>`;
+      routines.filter(r => !lastDayOf(r) || days.some(d => d.key <= lastDayOf(r))).forEach(r => {
+        html += `<tr><td class="${stickyCls} py-2.5 pl-4 pr-3 text-xs font-semibold text-ink whitespace-nowrap max-w-[130px] truncate"><span class="inline-flex items-center gap-1.5"><span class="text-muted">${iconSvg(iconKey(r), 'w-3.5 h-3.5')}</span>${r.name}</span></td>`;
         days.forEach(d => {
           const e = (logs[d.key] || {})[r.id];
-          if (!isActiveOn(r, d.key)) { html += `<td class="text-center py-2.5 px-1 text-muted/40 text-xs">–</td>`; return; }
+          if (!isActiveOn(r, d.key) || (r.asNeeded && !e)) { html += `<td class="text-center py-2.5 px-1 text-muted/40 text-xs">–</td>`; return; }
           const dot = e?.status === 'done' ? `<span class="inline-block w-2.5 h-2.5 rounded-full bg-forest"></span>`
             : (e?.status === 'skipped' ? `<span class="inline-block w-2.5 h-2.5 rounded-full border border-muted"></span>`
             : (d.key < todayKey
@@ -1543,20 +1646,27 @@
       days.forEach(d => {
         const dayLogs = logs[d.key] || {};
         const isPastDay = d.key < todayKey;
-        const entries = routines.filter(r => isActiveOn(r, d.key)).map(r => ({ routine: r, log: dayLogs[r.id], auto: !dayLogs[r.id] && isPastDay ? (r.priority === 'critical' ? 'missed' : 'auto') : null })).filter(x => x.log || x.auto);
+        const entries = routines.filter(r => isActiveOn(r, d.key)).map(r => ({ routine: r, log: dayLogs[r.id], auto: !dayLogs[r.id] && isPastDay && !r.asNeeded ? (r.priority === 'critical' ? 'missed' : 'auto') : null })).filter(x => x.log || x.auto);
         const card = document.createElement('div');
         card.className = 'bg-surface border border-line rounded-lg p-3.5';
         let rows = entries.length === 0 ? `<p class="text-xs text-muted italic mt-1">Kayıt girilmemiş.</p>` : `<div class="mt-2 space-y-1.5">` + entries.map(({ routine, log, auto }) => `
           <div class="flex items-center justify-between text-xs"><span class="font-medium text-ink">${routine.name}</span>${auto
             ? `<span class="font-mono text-[11px] text-signal">Verilmedi</span>`
-            : `<span class="font-mono text-[11px] ${log.status === 'done' ? 'text-forest' : 'text-muted'}">${log.status === 'done' ? (isSolo ? log.time : `${log.by} · ${log.time}`) : (isSolo ? 'Es geçildi' : `Es geçildi (${log.by})`)}</span>`}</div>`).join('') + `</div>`;
+            : `<span class="font-mono text-[11px] ${log.status === 'done' ? 'text-forest' : 'text-muted'}">${log.status === 'done' ? (routine.asNeeded && log.doses && log.doses.length > 1 ? `${log.doses.length} kez · ${log.time}` : (isSolo ? log.time : `${log.by} · ${log.time}`)) : (isSolo ? 'Es geçildi' : `Es geçildi (${log.by})`)}</span>`}</div>`).join('') + `</div>`;
         card.innerHTML = `<div class="flex items-center justify-between border-b border-line/60 pb-2"><span class="text-xs font-bold text-ink">${d.fullLabel}</span><button onclick="jumpToDate('${d.key}')" class="font-mono text-[11px] text-muted hover:text-ink underline underline-offset-2">Güne git →</button></div>${rows}`;
         feedEl.appendChild(card);
       });
     }
 
     // --- ŞURUP EKLE / SİL ---
+    window.togglePrn = () => {
+      const on = document.getElementById('inp-prn').checked;
+      document.getElementById('prn-box').classList.toggle('hidden', !on);
+      ['grp-time', 'grp-doses', 'grp-priority'].forEach(id => document.getElementById(id).classList.toggle('hidden', on));
+      document.getElementById('inp-time').required = !on;
+    };
     window.openAddModal = () => {
+      buildIconPicker('icon-picker-add', 'icon-add', null);
       document.getElementById('add-modal').classList.remove('hidden');
       document.getElementById('add-modal').classList.add('flex');
       document.getElementById('inp-name').focus();
@@ -1641,10 +1751,17 @@
       const time = document.getElementById('inp-time').value.trim();
       const note = document.getElementById('inp-note').value.trim();
       const priority = document.querySelector('input[name="priority"]:checked').value;
-      const n = doseCount();
+      const prn = document.getElementById('inp-prn').checked;
+      const days = parseInt(document.getElementById('inp-days').value, 10);
+      const minH = parseInt(document.getElementById('inp-minh').value, 10);
+      const extra = { icon: pickedIcon('icon-add') || iconGuess(name) };
+      if (days > 0) { extra.courseDays = days; extra.startedOn = getTodayKey(); }
+      const n = prn ? 1 : doseCount();
       let items;
-      if (n === 1) {
-        items = [{ id: 'r_' + Date.now(), name, time, note, priority, allowSkip: priority !== 'critical' }];
+      if (prn) {
+        items = [{ id: 'r_' + Date.now(), name, time: 'Gerektiğinde', note, priority: 'standard', allowSkip: true, asNeeded: true, ...(minH > 0 ? { minHours: minH } : {}), ...extra }];
+      } else if (n === 1) {
+        items = [{ id: 'r_' + Date.now(), name, time, note, priority, allowSkip: priority !== 'critical', ...extra }];
       } else {
         const mins = readDoseMinutes();
         if (!mins) {
@@ -1655,11 +1772,12 @@
         }
         const names = doseNames(name, mins);
         const stamp = Date.now();
-        items = mins.map((m, i) => ({ id: `r_${stamp}_${i}`, name: names[i], time: fmtHM(m), note, priority, allowSkip: priority !== 'critical' }));
+        items = mins.map((m, i) => ({ id: `r_${stamp}_${i}`, name: names[i], time: fmtHM(m), note, priority, allowSkip: priority !== 'critical', ...extra }));
       }
       const updated = sortRoutines([...routines, ...items]);
       await updateDoc(doc(db, 'families', familyCode), { routines: updated });
       e.target.reset();
+      window.togglePrn();
       window.refreshDoseTimes(true);
       window.closeAddModal();
     };
@@ -1680,13 +1798,20 @@
       showToast(`${r.name} sonlandırıldı`, 'TAMAM');
     };
     window.resumeRoutine = async (id) => {
-      await updateDoc(doc(db, 'families', familyCode), { routines: routines.map(x => { if (x.id !== id) return x; const { endedOn, ...rest } = x; return rest; }) });
+      await updateDoc(doc(db, 'families', familyCode), { routines: routines.map(x => { if (x.id !== id) return x; const { endedOn, ...rest } = x; if (rest.courseDays) rest.startedOn = getTodayKey(); return rest; }) });
     };
     let editingId = null;
     window.openEditModal = (id) => {
       const r = routines.find(x => x.id === id);
       if (!r) return;
       editingId = id;
+      buildIconPicker('icon-picker-edit', 'icon-edit', iconKey(r));
+      document.getElementById('edit-days').value = r.courseDays || '';
+      document.getElementById('edit-minh').value = r.minHours || '';
+      document.getElementById('edit-prn-box').classList.toggle('hidden', !r.asNeeded);
+      document.getElementById('edit-grp-time').classList.toggle('hidden', !!r.asNeeded);
+      document.getElementById('edit-grp-priority').classList.toggle('hidden', !!r.asNeeded);
+      document.getElementById('edit-time').required = !r.asNeeded;
       document.getElementById('edit-name').value = r.name;
       document.getElementById('edit-time').value = r.time;
       document.getElementById('edit-note').value = r.note || '';
@@ -1703,14 +1828,25 @@
       const name = document.getElementById('edit-name').value.trim();
       const time = document.getElementById('edit-time').value.trim();
       const note = document.getElementById('edit-note').value.trim();
-      const priority = document.querySelector('input[name="edit-priority"]:checked').value;
+      const cur = routines.find(x => x.id === editingId) || {};
+      const priority = cur.asNeeded ? 'standard' : document.querySelector('input[name="edit-priority"]:checked').value;
       const err = document.getElementById('edit-error');
-      if (!/^\d{1,2}:\d{2}([–-]\d{1,2}:\d{2})?$/.test(time)) {
+      if (!cur.asNeeded && !/^\d{1,2}:\d{2}([–-]\d{1,2}:\d{2})?$/.test(time)) {
         err.textContent = 'Saat 14:00 ya da 10:00-17:00 biçiminde yazılmalı.';
         err.classList.remove('hidden');
         return;
       }
-      const updated = sortRoutines(routines.map(x => x.id === editingId ? { ...x, name, time, note, priority, allowSkip: priority !== 'critical' } : x));
+      const days = parseInt(document.getElementById('edit-days').value, 10);
+      const minH = parseInt(document.getElementById('edit-minh').value, 10);
+      const updated = sortRoutines(routines.map(x => {
+        if (x.id !== editingId) return x;
+        const n = { ...x, name, note, priority, allowSkip: priority !== 'critical', icon: pickedIcon('icon-edit') || iconKey(x) };
+        if (!x.asNeeded) n.time = time;
+        else { if (minH > 0) n.minHours = minH; else delete n.minHours; }
+        if (days > 0) { n.courseDays = days; if (!n.startedOn) n.startedOn = getTodayKey(); }
+        else { delete n.courseDays; delete n.startedOn; }
+        return n;
+      }));
       await updateDoc(doc(db, 'families', familyCode), { routines: updated });
       closeEditModal();
       showToast('Doz güncellendi', 'TAMAM');
