@@ -549,6 +549,7 @@
       return [r.endedOn, c].filter(Boolean).sort()[0] || null;
     };
     const isActiveOn = (r, key) => { const l = lastDayOf(r); return (!l || key <= l) && !(r.courseDays && r.startedOn && key < r.startedOn); };
+    const groupIds = (id) => { const r = routines.find(x => x.id === id); return r && r.groupId ? routines.filter(x => x.groupId === r.groupId).map(x => x.id) : [id]; };
     const dayNumberOf = (r, key) => Math.round((parseDateKey(key) - parseDateKey(r.startedOn)) / 86400000) + 1;
     // --- İKONLAR ---
     const ICON_SVG = {
@@ -1520,7 +1521,60 @@
       lastLockSig = lockSig();
       lastPrnRender = Date.now();
       const visible = routines.filter(r => isActiveOn(r, selectedDateKey) && !(r.asNeeded && isPast && !dayLogs[r.id]));
+      // Aynı ilacın çok dozlu kayıtları (groupId) tek kartta birleşir
+      const units = []; const seenG = new Set();
       visible.forEach(r => {
+        if (!r.groupId) { units.push([r]); return; }
+        if (seenG.has(r.groupId)) return;
+        seenG.add(r.groupId);
+        units.push(visible.filter(x => x.groupId === r.groupId));
+      });
+      const doneLine = (m, e) => {
+        const skipped = e.status === 'skipped';
+        const undo = (!isPast && !editMode && e.by === currentProfile) ? `<button onclick="undoAction('${m.id}')" class="text-[11px] font-medium text-muted hover:text-ink underline underline-offset-2">Geri al</button>` : '';
+        const who = skipped ? (isSolo ? 'es geçildi' : `${e.by} es geçti`) : (isSolo ? 'verildi' : `${e.by} verdi`);
+        const mark = skipped ? '<span class="text-muted">–</span>' : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>';
+        return `<div class="flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold ${skipped ? 'text-muted' : 'text-forest'}">${mark}<span class="font-mono">${m.time}</span> ${who}</span><span class="flex items-center gap-3"><span class="font-mono text-muted">${e.time}</span>${undo}</span></div>`;
+      };
+      const renderGroupCard = (unit) => {
+        const mem = unit.slice().sort((a, b) => startMinutes(a.time) - startMinutes(b.time));
+        const g = mem[0];
+        const ents = mem.map(m => dayLogs[m.id]);
+        const next = mem.find(m => !dayLogs[m.id]) || null;
+        const allDone = !next;
+        const shown = next || mem[mem.length - 1];
+        const crit = g.priority === 'critical';
+        const dots = mem.map((m, i) => ents[i] ? (ents[i].status === 'skipped' ? '<span class="inline-block w-2.5 h-2.5 rounded-full border border-muted"></span>' : '<span class="inline-block w-2.5 h-2.5 rounded-full bg-forest"></span>') : (isPast ? '<span class="inline-block w-2.5 h-2.5 rounded-full border border-signal"></span>' : '<span class="inline-block w-2.5 h-2.5 rounded-full border border-muted"></span>')).join('');
+        const meta = [g.note, (g.courseDays && g.startedOn) ? `${Math.min(dayNumberOf(g, selectedDateKey), g.courseDays)}. gün / ${g.courseDays}` : ''].filter(Boolean).join(' · ');
+        const card = document.createElement('div');
+        card.className = `bg-surface rounded-lg border transition-all p-4 ${allDone ? 'border-line bg-surface/70' : (crit ? 'border-ink/25 shadow-sm' : 'border-line')}`;
+        const rows = mem.map((m, i) => ents[i] ? doneLine(m, ents[i]) : (isPast ? `<div class="flex items-center justify-between text-xs"><span><span class="font-mono text-muted">${m.time}</span> <span class="font-semibold text-signal">Verilmedi</span></span></div>` : '')).filter(Boolean);
+        const timeParts = shown.time.split(/[–-]/).map(t => `<span class="block">${t.trim()}</span>`).join('');
+        let html = `<div class="flex items-start justify-between gap-3"><div class="flex items-start gap-3"><div class="pt-0.5"><span style="width:66px" class="inline-block text-center font-mono text-xs font-semibold leading-snug py-0.5 rounded ${allDone ? 'bg-emerald-50 text-forest' : (crit ? 'bg-signal/10 text-signal' : 'bg-paper text-ink')}">${timeParts}</span></div><div><h3 class="text-sm font-bold flex items-center gap-1.5 ${allDone ? 'text-muted line-through decoration-muted/50' : 'text-ink'}"><span class="text-muted shrink-0">${iconSvg(iconKey(g), 'w-4 h-4')}</span><span>${g.groupName || g.name}</span></h3>${meta ? `<p class="text-xs text-muted mt-0.5">${meta}</p>` : ''}</div></div><div class="flex items-center gap-1 pt-1.5 shrink-0" title="${ents.filter(Boolean).length}/${mem.length} doz">${dots}</div></div>`;
+        if (rows.length) html += `<div class="mt-3 pt-2.5 border-t border-line/70 space-y-1.5">${rows.join('')}</div>`;
+        if (next && !isPast && !editMode) {
+          if (crit && isTimeLocked(next)) {
+            html += `<div class="mt-3.5 w-full h-11 rounded-md border border-line bg-paper flex items-center justify-center gap-2 font-mono text-[11px] font-semibold tracking-wider text-muted"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>${next.time.split('–')[0]} SAATİNDE AÇILIR</div>`;
+          } else if (crit) {
+            html += `<div id="hold-${next.id}" class="mt-3.5 relative w-full h-11 rounded-md border border-signal/40 bg-signal/5 overflow-hidden no-select cursor-pointer touch-none" oncontextmenu="return false;"><div class="fill-layer syrup-fill absolute bottom-0 left-0 right-0 h-0 pointer-events-none"></div><div class="bubbles-layer absolute inset-0 overflow-hidden pointer-events-none"></div><div class="label-layer relative z-10 w-full h-full flex items-center justify-center font-mono text-[11px] font-semibold tracking-wider text-signal pointer-events-none">VERMEK İÇİN BASILI TUT</div></div>`;
+          } else {
+            html += `<div class="mt-3.5 flex gap-2"><button onclick="recordAction('${next.id}', 'done')" class="flex-1 h-9 rounded-md bg-ink text-white text-xs font-semibold hover:bg-neutral-800 active:scale-[0.99] transition">Verildi Olarak İşaretle</button><button onclick="recordAction('${next.id}', 'skipped')" class="px-3 h-9 rounded-md border border-line bg-paper text-muted text-xs font-medium hover:text-ink transition">Bugün Yok</button></div>`;
+          }
+        }
+        if (editMode) {
+          html += `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs font-semibold"><div class="flex flex-wrap gap-x-4 gap-y-1">${mem.map(m => `<button onclick="openEditModal('${m.id}')" class="text-ink underline underline-offset-4">${m.time} düzenle</button>`).join('')}</div><div class="flex items-center gap-5 mt-2"><button onclick="endRoutine('${g.id}')" class="text-signal underline underline-offset-4">Dozu sonlandır</button><button onclick="deleteRoutine('${g.id}')" class="text-red-600 underline underline-offset-4 ml-auto">Sil</button></div></div>`;
+        }
+        card.innerHTML = html;
+        listEl.appendChild(card);
+        if (next && !isPast && !editMode && crit && !isTimeLocked(next)) attachHoldMechanic(document.getElementById(`hold-${next.id}`), next.id);
+      };
+      units.forEach(unit => {
+        if (unit[0].groupId) {
+          renderGroupCard(unit);
+          unit.forEach(m => { if (dayLogs[m.id] || (isPast && m.priority !== 'critical')) completedCount++; });
+          return;
+        }
+        const r = unit[0];
         const entry = dayLogs[r.id];
         // Geçmişte kaydı olmayan kritik olmayan rutin otomatik "Bugün yok" sayılır (yazılmaz, sadece görünür)
         const autoSkipped = isPast && !entry && r.priority !== 'critical' && !r.asNeeded;
@@ -1582,11 +1636,12 @@
         listEl.appendChild(empty);
       }
       if (editMode) {
-        const ended = routines.filter(r => lastDayOf(r) && selectedDateKey > lastDayOf(r));
+        const seenEnd = new Set();
+        const ended = routines.filter(r => { if (!(lastDayOf(r) && selectedDateKey > lastDayOf(r))) return false; if (!r.groupId) return true; if (seenEnd.has(r.groupId)) return false; seenEnd.add(r.groupId); return true; });
         if (ended.length) {
           const sec = document.createElement('div');
           sec.className = 'pt-2';
-          sec.innerHTML = `<p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted mb-2">Sonlandırılanlar</p>` + ended.map(r => `<div class="bg-surface/70 rounded-lg border border-line p-3 mb-2 flex items-center justify-between gap-3"><div><p class="text-sm font-bold text-muted">${r.name}</p><p class="text-[11px] text-muted font-mono">${r.time} · ${lastDayOf(r)} tarihine kadar</p></div><div class="flex items-center gap-4 text-xs font-semibold shrink-0"><button onclick="resumeRoutine('${r.id}')" class="text-ink underline underline-offset-4">Yeniden başlat</button><button onclick="deleteRoutine('${r.id}')" class="text-red-600 underline underline-offset-4">Sil</button></div></div>`).join('');
+          sec.innerHTML = `<p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted mb-2">Sonlandırılanlar</p>` + ended.map(r => `<div class="bg-surface/70 rounded-lg border border-line p-3 mb-2 flex items-center justify-between gap-3"><div><p class="text-sm font-bold text-muted">${r.groupName || r.name}</p><p class="text-[11px] text-muted font-mono">${r.groupId ? routines.filter(x => x.groupId === r.groupId).map(x => x.time).join(' · ') : r.time} · ${lastDayOf(r)} tarihine kadar</p></div><div class="flex items-center gap-4 text-xs font-semibold shrink-0"><button onclick="resumeRoutine('${r.id}')" class="text-ink underline underline-offset-4">Yeniden başlat</button><button onclick="deleteRoutine('${r.id}')" class="text-red-600 underline underline-offset-4">Sil</button></div></div>`).join('');
           listEl.appendChild(sec);
         }
       }
@@ -1772,7 +1827,7 @@
         }
         const names = doseNames(name, mins);
         const stamp = Date.now();
-        items = mins.map((m, i) => ({ id: `r_${stamp}_${i}`, name: names[i], time: fmtHM(m), note, priority, allowSkip: priority !== 'critical', ...extra }));
+        items = mins.map((m, i) => ({ id: `r_${stamp}_${i}`, groupId: `g_${stamp}`, groupName: name, name: names[i], time: fmtHM(m), note, priority, allowSkip: priority !== 'critical', ...extra }));
       }
       const updated = sortRoutines([...routines, ...items]);
       await updateDoc(doc(db, 'families', familyCode), { routines: updated });
@@ -1789,16 +1844,17 @@
     window.endRoutine = async (id) => {
       const r = routines.find(x => x.id === id);
       if (!r) return;
-      if (!confirm(`"${r.name}" sonlandırılsın mı?\n\nListeden kalkar ve hatırlatma gitmez. Geçmiş kayıtlar saklanır; "Yeniden başlat" ile geri açabilirsiniz.`)) return;
+      if (!confirm(`"${r.groupName || r.name}" sonlandırılsın mı?\n\nListeden kalkar ve hatırlatma gitmez. Geçmiş kayıtlar saklanır; "Yeniden başlat" ile geri açabilirsiniz.`)) return;
       const today = getTodayKey();
       // Bugün zaten verilmişse bugün dahil, verilmemişse dünden itibaren bitmiş sayılır
       const y = new Date(); y.setDate(y.getDate() - 1);
-      const last = (logs[today] || {})[id] ? today : dateKeyOf(y);
-      await updateDoc(doc(db, 'families', familyCode), { routines: routines.map(x => x.id === id ? { ...x, endedOn: last } : x) });
-      showToast(`${r.name} sonlandırıldı`, 'TAMAM');
+      const ids = groupIds(id);
+      const last = ids.some(i => (logs[today] || {})[i]) ? today : dateKeyOf(y);
+      await updateDoc(doc(db, 'families', familyCode), { routines: routines.map(x => ids.includes(x.id) ? { ...x, endedOn: last } : x) });
+      showToast(`${r.groupName || r.name} sonlandırıldı`, 'TAMAM');
     };
     window.resumeRoutine = async (id) => {
-      await updateDoc(doc(db, 'families', familyCode), { routines: routines.map(x => { if (x.id !== id) return x; const { endedOn, ...rest } = x; if (rest.courseDays) rest.startedOn = getTodayKey(); return rest; }) });
+      await updateDoc(doc(db, 'families', familyCode), { routines: routines.map(x => { if (!groupIds(id).includes(x.id)) return x; const { endedOn, ...rest } = x; if (rest.courseDays) rest.startedOn = getTodayKey(); return rest; }) });
     };
     let editingId = null;
     window.openEditModal = (id) => {
@@ -1812,7 +1868,7 @@
       document.getElementById('edit-grp-time').classList.toggle('hidden', !!r.asNeeded);
       document.getElementById('edit-grp-priority').classList.toggle('hidden', !!r.asNeeded);
       document.getElementById('edit-time').required = !r.asNeeded;
-      document.getElementById('edit-name').value = r.name;
+      document.getElementById('edit-name').value = r.groupName || r.name;
       document.getElementById('edit-time').value = r.time;
       document.getElementById('edit-note').value = r.note || '';
       document.querySelector(`input[name="edit-priority"][value="${r.priority === 'critical' ? 'critical' : 'standard'}"]`).checked = true;
@@ -1839,10 +1895,12 @@
       const days = parseInt(document.getElementById('edit-days').value, 10);
       const minH = parseInt(document.getElementById('edit-minh').value, 10);
       const updated = sortRoutines(routines.map(x => {
-        if (x.id !== editingId) return x;
+        const inGroup = cur.groupId && x.groupId === cur.groupId;
+        if (x.id !== editingId && !inGroup) return x;
         const n = { ...x, name, note, priority, allowSkip: priority !== 'critical', icon: pickedIcon('icon-edit') || iconKey(x) };
-        if (!x.asNeeded) n.time = time;
-        else { if (minH > 0) n.minHours = minH; else delete n.minHours; }
+        if (x.groupId) { const old = cur.groupName || ''; n.groupName = name; n.name = (old && x.name.startsWith(old)) ? name + x.name.slice(old.length) : x.name; }
+        if (x.asNeeded) { /* saat yok */ } else if (x.id === editingId) n.time = time;
+        if (x.asNeeded) { if (minH > 0) n.minHours = minH; else delete n.minHours; }
         if (days > 0) { n.courseDays = days; if (!n.startedOn) n.startedOn = getTodayKey(); }
         else { delete n.courseDays; delete n.startedOn; }
         return n;
@@ -1852,7 +1910,8 @@
       showToast('Doz güncellendi', 'TAMAM');
     };
     window.deleteRoutine = async (id) => {
-      const updated = routines.filter(r => r.id !== id);
+      const gids = groupIds(id);
+      const updated = routines.filter(r => !gids.includes(r.id));
       await updateDoc(doc(db, 'families', familyCode), { routines: updated });
     };
 
