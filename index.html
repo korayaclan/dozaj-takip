@@ -583,7 +583,7 @@
       history.replaceState(null, '', location.origin + location.pathname);
       let email = localStorage.getItem('dozaj_email_pending') || '';
       if (!email) email = (prompt('Giriş için e-posta adresinizi yazın:') || '').trim();
-      if (!email) return false;
+      if (!email) { try { sessionStorage.setItem('dozaj_msg', 'E-posta adresi girilmediği için giriş tamamlanamadı. Bağlantıyı yeniden açın.'); } catch (x) {} return false; }
       let linkedNow = false;
       try {
         if (auth.currentUser && auth.currentUser.isAnonymous) {
@@ -597,7 +597,7 @@
         try { await signInWithEmailLink(auth, email, href); }
         catch (err2) {
           console.error(err2);
-          try { sessionStorage.setItem('dozaj_msg', 'E-posta bağlantısı geçersiz ya da süresi dolmuş. Yeni bir bağlantı isteyin.'); } catch (x) {}
+          try { sessionStorage.setItem('dozaj_msg', 'E-posta bağlantısı geçersiz, süresi dolmuş ya da farklı adresle açıldı. Yeni bir bağlantı isteyin. (' + (err2 && err2.code || 'hata') + ')'); } catch (x) {}
           return false;
         }
       }
@@ -632,6 +632,7 @@
         }
       } catch (err) { console.error(err); }
       if (familyCode) await saveUserDoc();
+      else { try { sessionStorage.setItem('dozaj_ok', auth.currentUser.email + ' ile giriş yapıldı ama bu e-posta henüz bir aileye bağlı değil. Aile kodunuzla bağlanın; e-posta otomatik eklenir.'); } catch (x) {} }
       return false;
     }
 
