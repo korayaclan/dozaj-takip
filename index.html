@@ -87,11 +87,21 @@
 
   <!-- EKRAN 0: EŞLEŞME (AİLE KODU) EKRANI -->
   <div id="screen-onboarding" class="hidden max-w-md mx-auto px-5 pt-12">
-    <p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">AİLE EŞLEŞTİRME</p>
+    <p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">BAŞLANGIÇ</p>
     <h1 class="text-2xl font-bold tracking-tight text-ink mt-1">Dozaj Takip</h1>
     <p class="text-sm text-muted mt-2 leading-relaxed">
-      Şurup ve takviye kayıtlarının iki telefonda anlık senkronize olması için tek seferlik aile kodunuzu oluşturun veya eşinizin kodunu girin.
+      Şurup ve takviye dozlarınızı takip edin. Tek başınıza kullanabilir ya da eşinizle iki telefonda anlık senkronize edebilirsiniz.
     </p>
+
+    <div class="mt-6 bg-surface border border-ink rounded-xl p-5">
+      <p class="text-sm font-bold text-ink">Tek başıma kullanacağım</p>
+      <p class="text-xs text-muted mt-1 leading-relaxed">Kayıtlar yalnızca sizin için tutulur. Eş ya da aile sonradan eklenebilir.</p>
+      <button onclick="createSoloAccount()" id="btn-create-solo" class="mt-3.5 w-full py-3 bg-ink text-white text-sm font-semibold rounded-md hover:bg-neutral-800 active:scale-[0.99] transition">
+        Başla
+      </button>
+    </div>
+
+    <p class="mt-7 font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">AİLE İLE PAYLAŞ</p>
 
     <div class="mt-6 bg-surface border border-line rounded-xl p-5 space-y-5">
       <!-- Kim Kullanıyor? -->
@@ -111,7 +121,7 @@
 
       <div class="relative flex py-1 items-center">
         <div class="flex-grow border-t border-line"></div>
-        <span class="flex-shrink mx-3 text-[11px] font-mono text-muted uppercase">veya mevcut koda katıl</span>
+        <span class="flex-shrink mx-3 text-[11px] font-mono text-muted uppercase">veya kodla giriş yap</span>
         <div class="flex-grow border-t border-line"></div>
       </div>
 
@@ -178,7 +188,7 @@
       <div id="notif-ask" class="hidden flex items-center justify-between gap-3">
         <div>
           <p class="text-xs font-bold text-ink">Bildirimler kapalı</p>
-          <p class="text-[11px] text-muted mt-0.5">Eşinizin onaylarını ve alarmları almak için açın.</p>
+          <p id="notif-ask-text" class="text-[11px] text-muted mt-0.5">Eşinizin onaylarını ve alarmları almak için açın.</p>
         </div>
         <button onclick="enableNotifications()" id="btn-enable-notif" class="px-3 py-2 bg-signal text-white text-xs font-semibold rounded-md shrink-0 hover:opacity-90 transition">
           Bildirimleri Aç
@@ -222,9 +232,13 @@
         <button onclick="toggleEditMode()" id="btn-edit-mode" class="hover:text-ink underline underline-offset-4 transition">
           Listeyi düzenle / sil
         </button>
-        <button onclick="leaveFamily()" class="hover:text-red-600 underline underline-offset-4 transition">
+        <button onclick="leaveFamily()" id="btn-leave" class="hover:text-red-600 underline underline-offset-4 transition">
           Aile kodundan çık
         </button>
+      </div>
+      <div id="solo-footer" class="hidden mt-4 p-3 border border-line rounded-md bg-surface text-xs text-muted leading-relaxed">
+        <p>Kodunuz <span id="solo-code" class="font-mono font-semibold text-ink"></span>. Telefonu değiştirirseniz bu kodla giriş yaparsınız, bir yere not alın.</p>
+        <button onclick="addPartner()" class="mt-2 font-semibold text-ink underline underline-offset-4">Eş / aile ekle</button>
       </div>
       <div class="mt-3 text-xs text-muted">
         <button onclick="toggleNotifTest()" class="hover:text-ink underline underline-offset-4 transition">Bildirimi test et</button>
@@ -232,7 +246,7 @@
       <div id="notif-test" class="hidden mt-3 p-3 border border-line rounded-md bg-surface text-xs">
         <div class="flex gap-2 mb-3">
           <button onclick="runNotifTest('self')" class="px-3 py-2 bg-ink text-white font-semibold rounded-md">Kendime gönder</button>
-          <button onclick="runNotifTest('partner')" class="px-3 py-2 border border-line font-semibold rounded-md">Eşime gönder</button>
+          <button onclick="runNotifTest('partner')" id="btn-test-partner" class="px-3 py-2 border border-line font-semibold rounded-md">Eşime gönder</button>
         </div>
         <ul id="notif-test-out" class="space-y-1.5 text-ink"></ul>
       </div>
@@ -241,7 +255,7 @@
     <!-- SEKME 2: GEÇMİŞ TAKİP -->
     <section id="view-history" class="pt-5 hidden">
       <div class="mb-5">
-        <p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">KAYIT DEFTERİ</p>
+        <p id="history-month" class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">KAYIT DEFTERİ</p>
         <h1 class="text-xl font-bold tracking-tight text-ink mt-0.5">Son 14 Gün</h1>
       </div>
       <div id="history-matrix" class="bg-surface border border-line rounded-lg py-4 pr-4 mb-6 overflow-x-auto no-scrollbar"></div>
@@ -471,6 +485,17 @@
 
     let familyCode = localStorage.getItem('dozaj_family_code') || '';
     let currentProfile = localStorage.getItem('dozaj_profile') || 'Anne';
+    // Tek kullanıcı modu: aynı aile belgesi, tek profil ("Anne" olarak saklanır), ekranda "Sen"
+    let isSolo = localStorage.getItem('dozaj_mode') === 'solo';
+    const whoText = (p) => (isSolo ? 'Sen' : p);
+    function applySoloUI() {
+      document.getElementById('badge-profile').textContent = isSolo ? 'Sen' : currentProfile;
+      document.getElementById('solo-footer').classList.toggle('hidden', !isSolo);
+      document.getElementById('solo-code').textContent = familyCode;
+      document.getElementById('btn-test-partner').classList.toggle('hidden', isSolo);
+      document.getElementById('notif-ask-text').textContent = isSolo ? 'Doz hatırlatmalarını almak için açın.' : 'Eşinizin onaylarını ve alarmları almak için açın.';
+      document.getElementById('btn-leave').textContent = isSolo ? 'Bu telefondan çık' : 'Aile kodundan çık';
+    }
     let onboardingProfile = 'Anne';
     let routines = DEFAULT_ROUTINES;
     let logs = {};
@@ -529,7 +554,7 @@
 
     function kickOut() {
       try {
-        sessionStorage.setItem('dozaj_msg', `Bu aile kodunda "${currentProfile}" oturumu başka bir telefonda açık olduğu için bu telefondaki oturum kapatıldı.`);
+        sessionStorage.setItem('dozaj_msg', isSolo ? 'Bu hesap başka bir telefonda açıldığı için bu telefondaki oturum kapatıldı.' : `Bu aile kodunda "${currentProfile}" oturumu başka bir telefonda açık olduğu için bu telefondaki oturum kapatıldı.`);
       } catch (e) {}
       localStorage.removeItem('dozaj_family_code');
       location.reload();
@@ -544,6 +569,45 @@
       document.getElementById('onb-baba').className = p === 'Baba' ? onCls : offCls;
     };
 
+    window.createSoloAccount = async () => {
+      const btn = document.getElementById('btn-create-solo');
+      btn.disabled = true; btn.textContent = 'Hazırlanıyor...';
+      const code = `${Math.floor(100 + Math.random() * 900)}-${Math.floor(100 + Math.random() * 900)}`;
+      try {
+        await setDoc(doc(db, 'families', code), {
+          createdAt: Date.now(),
+          mode: 'solo',
+          routines: [],
+          tokens: {},
+          sessions: { Anne: { deviceId: DEVICE_ID, lastSeen: Date.now() } }
+        });
+      } catch (e) {
+        console.error(e);
+        btn.disabled = false; btn.textContent = 'Başla';
+        const errEl = document.getElementById('onb-error');
+        errEl.textContent = 'Bağlantı kurulamadı. İnternetinizi kontrol edip tekrar deneyin.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      familyCode = code;
+      currentProfile = 'Anne';
+      isSolo = true; routines = [];
+      localStorage.setItem('dozaj_family_code', familyCode);
+      localStorage.setItem('dozaj_profile', currentProfile);
+      localStorage.setItem('dozaj_mode', 'solo');
+      startSyncedApp();
+    };
+
+    window.addPartner = async () => {
+      if (!confirm(`Eş / aile eklensin mi?\n\nEşiniz uygulamada "Baba"yı seçip ${familyCode} koduyla giriş yapar. Bu telefon "Anne" olarak kalır ve kayıtlarınız korunur.`)) return;
+      await updateDoc(doc(db, 'families', familyCode), { mode: deleteField() });
+      isSolo = false;
+      localStorage.removeItem('dozaj_mode');
+      applySoloUI(); renderRoutine();
+      navigator.clipboard?.writeText(familyCode);
+      showToast(`Eşiniz bu kodla katılabilir: ${familyCode}`, 'KOD');
+    };
+
     window.createNewFamily = async () => {
       const btn = document.getElementById('btn-create-fam');
       btn.disabled = true; btn.textContent = 'Oluşturuluyor...';
@@ -556,6 +620,7 @@
       });
       familyCode = code;
       currentProfile = onboardingProfile;
+      isSolo = false; localStorage.removeItem('dozaj_mode');
       localStorage.setItem('dozaj_family_code', familyCode);
       localStorage.setItem('dozaj_profile', currentProfile);
       startSyncedApp();
@@ -585,6 +650,9 @@
         errEl.classList.remove('hidden');
         return;
       }
+      // Tek kullanıcı hesabıysa profil seçimi gerekmez
+      const soloDoc = famSnap.data().mode === 'solo';
+      if (soloDoc) onboardingProfile = 'Anne';
       // Aynı aile kodunda aynı profil için ikinci oturum açılamaz.
       let claim;
       try { claim = await claimSession(raw, onboardingProfile); }
@@ -596,19 +664,22 @@
       }
       if (!claim.ok) {
         const other = onboardingProfile === 'Anne' ? 'Baba' : 'Anne';
+        if (soloDoc) { errEl.textContent = 'Bu hesap başka bir telefonda açık. Eski telefonda "Bu telefondan çık" yapıp tekrar deneyin.'; errEl.classList.remove('hidden'); return; }
         errEl.textContent = `Bu aile kodunda "${onboardingProfile}" zaten başka bir telefonda açık; ikinci ${onboardingProfile} oturumu açılamaz. Bu telefon ${other} ise ${other}'yı seçin. ${onboardingProfile} telefonunu değiştirdiyseniz eski telefonda "Aile kodundan çık" yapın.`;
         errEl.classList.remove('hidden');
         return;
       }
       familyCode = raw;
       currentProfile = onboardingProfile;
+      isSolo = soloDoc; if (soloDoc) routines = [];
+      if (soloDoc) localStorage.setItem('dozaj_mode', 'solo'); else localStorage.removeItem('dozaj_mode');
       localStorage.setItem('dozaj_family_code', familyCode);
       localStorage.setItem('dozaj_profile', currentProfile);
       startSyncedApp();
     };
 
     window.leaveFamily = async () => {
-      if (!confirm('Bu cihazdaki aile kodundan çıkış yapılsın mı?')) return;
+      if (!confirm(isSolo ? `Bu telefondan çıkış yapılsın mı?\n\nKayıtlarınız silinmez; ${familyCode} koduyla tekrar giriş yapabilirsiniz.` : 'Bu cihazdaki aile kodundan çıkış yapılsın mı?')) return;
       // Oturumu ve bildirim kaydını bırak ki bu profil başka telefonda açılabilsin.
       try {
         const ref = doc(db, 'families', familyCode);
@@ -622,6 +693,7 @@
         });
       } catch (e) { console.error(e); }
       localStorage.removeItem('dozaj_family_code');
+      localStorage.removeItem('dozaj_mode');
       location.reload();
     };
 
@@ -634,8 +706,9 @@
     function startSyncedApp() {
       document.getElementById('screen-onboarding').classList.add('hidden');
       document.getElementById('screen-app').classList.remove('hidden');
-      document.getElementById('badge-profile').textContent = currentProfile;
       document.getElementById('badge-code').textContent = familyCode;
+      if (isSolo) routines = [];
+      applySoloUI();
 
       checkNotificationUI();
 
@@ -656,6 +729,8 @@
             if (s && s.deviceId !== DEVICE_ID && Date.now() - (s.lastSeen || 0) < SESSION_TTL) { kickOut(); return; }
             if (!s) claimSession(familyCode, currentProfile).catch(() => {});
           }
+          const soloNow = snap.data().mode === 'solo';
+          if (soloNow !== isSolo) { isSolo = soloNow; if (soloNow) localStorage.setItem('dozaj_mode', 'solo'); else localStorage.removeItem('dozaj_mode'); applySoloUI(); }
           routines = sortRoutines(snap.data().routines || DEFAULT_ROUTINES);
           if (activeTab === 'routine') renderRoutine();
           else renderHistory();
@@ -804,6 +879,7 @@
       }, { merge: true });
 
       const partner = currentProfile === 'Anne' ? 'Baba' : 'Anne';
+      if (isSolo) { showToast(status === 'skipped' ? 'Es geçildi olarak kaydedildi' : `Kaydedildi: ${routine.name}`, nowTime); return; }
       showToast(status === 'skipped' ? `${partner}'ya iletildi (Es geçildi)` : `${partner}'ya iletildi: ${routine.name}`, nowTime);
 
       // Sunucu üzerinden karşı tarafa gerçek Push Bildirimi at
@@ -842,7 +918,7 @@
       // Kaydı kim girdiyse sadece o geri alabilir
       const entry = (logs[selectedDateKey] || {})[routineId];
       if (entry && entry.by !== currentProfile) {
-        showToast(`Bunu sadece ${entry.by} geri alabilir`, 'İZİN YOK');
+        showToast(`Bunu sadece ${whoText(entry.by)} geri alabilir`, 'İZİN YOK');
         return;
       }
       await updateDoc(doc(db, 'families', familyCode, 'logs', selectedDateKey), {
@@ -1168,8 +1244,8 @@
         let actionHtml = '';
         if (entry) {
           actionHtml = isDone
-            ? `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold text-forest"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>${entry.by} tarafından verildi</span><span class="font-mono text-muted font-medium">${entry.time}</span></div>`
-            : `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs text-muted"><span>${entry.by} tarafından es geçildi</span><span class="font-mono">${entry.time}</span></div>`;
+            ? `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold text-forest"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>${isSolo ? 'Verildi' : `${entry.by} tarafından verildi`}</span><span class="font-mono text-muted font-medium">${entry.time}</span></div>`
+            : `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs text-muted"><span>${isSolo ? 'Es geçildi' : `${entry.by} tarafından es geçildi`}</span><span class="font-mono">${entry.time}</span></div>`;
         } else if (isPast) {
           actionHtml = autoSkipped
             ? `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs text-muted">Bugün yok (otomatik)</div>`
@@ -1186,6 +1262,12 @@
         if (!entry && !isPast && !editMode && r.priority === 'critical') attachHoldMechanic(document.getElementById(`hold-${r.id}`), r.id);
       });
 
+      if (visible.length === 0 && !editMode) {
+        const empty = document.createElement('div');
+        empty.className = 'bg-surface rounded-lg border border-dashed border-line p-6 text-center';
+        empty.innerHTML = `<p class="text-sm font-bold text-ink">Henüz doz eklenmedi</p><p class="text-xs text-muted mt-1 leading-relaxed">Sağ üstteki <strong>Ekle</strong> düğmesiyle ilk şurup ya da takviyeni ekle.</p>`;
+        listEl.appendChild(empty);
+      }
       if (editMode) {
         const ended = routines.filter(r => r.endedOn && selectedDateKey > r.endedOn);
         if (ended.length) {
@@ -1213,12 +1295,19 @@
         });
       }
 
+      const mFmt = (d, withYear) => d.toLocaleDateString('tr-TR', withYear ? { month: 'long', year: 'numeric' } : { month: 'long' });
+      const newestD = parseDateKey(days[0].key), oldestD = parseDateKey(days[days.length - 1].key);
+      const spans = newestD.getMonth() !== oldestD.getMonth();
+      document.getElementById('history-month').textContent = 'KAYIT DEFTERİ · ' + (spans
+        ? (newestD.getFullYear() !== oldestD.getFullYear() ? `${mFmt(oldestD, true)} – ${mFmt(newestD, true)}` : `${mFmt(oldestD)} – ${mFmt(newestD, true)}`)
+        : mFmt(newestD, true));
+
       const matrixEl = document.getElementById('history-matrix');
       // Bugün rutin adlarının hemen sağında, geçmiş günler sağa doğru uzar. Rutin sütunu kaydırırken sabit kalır.
       const stickyCls = 'sticky left-0 z-10 bg-surface shadow-[1px_0_0_0_#E4E2DC]';
       let html = `<table class="w-full text-left border-collapse"><thead><tr><th class="${stickyCls} pl-4 pr-3 text-[11px] font-semibold text-muted pb-2 whitespace-nowrap">Rutin</th>`;
       days.forEach(d => {
-        html += `<th class="text-center pb-2 px-1"><button onclick="jumpToDate('${d.key}')" class="hover:bg-paper rounded px-1 py-0.5"><span class="block font-mono text-[10px] text-muted">${d.dayShort}</span><span class="block font-mono text-[11px] font-semibold ${d.key === todayKey ? 'text-signal' : 'text-ink'}">${d.dayNum}</span></button></th>`;
+        html += `<th class="text-center pb-2 px-1"><button onclick="jumpToDate('${d.key}')" class="hover:bg-paper rounded px-1 py-0.5"><span class="block font-mono text-[10px] text-muted">${d.dayShort}</span><span class="block font-mono text-[11px] font-semibold ${d.key === todayKey ? 'text-signal' : 'text-ink'}">${d.dayNum}</span>${spans && d.dayNum === 1 ? `<span class="block font-mono text-[9px] text-muted">${parseDateKey(d.key).toLocaleDateString('tr-TR', { month: 'short' })}</span>` : ''}</button></th>`;
       });
       html += `</tr></thead><tbody class="divide-y divide-line/60">`;
       routines.filter(r => !r.endedOn || days.some(d => d.key <= r.endedOn)).forEach(r => {
@@ -1228,23 +1317,30 @@
           if (!isActiveOn(r, d.key)) { html += `<td class="text-center py-2.5 px-1 text-muted/40 text-xs">–</td>`; return; }
           const dot = e?.status === 'done' ? `<span class="inline-block w-2.5 h-2.5 rounded-full bg-forest"></span>`
             : (e?.status === 'skipped' ? `<span class="inline-block w-2.5 h-2.5 rounded-full border border-muted"></span>`
-            : `<span class="inline-block w-2.5 h-2.5 rounded-full bg-line"></span>`);
+            : (d.key < todayKey
+              ? (r.priority === 'critical'
+                ? `<span class="inline-block w-2.5 h-2.5 rounded-full border border-signal"></span>`
+                : `<span class="inline-block w-2.5 h-2.5 rounded-full border border-muted"></span>`)
+              : `<span class="inline-block w-2.5 h-2.5 rounded-full bg-line"></span>`));
           html += `<td class="text-center py-2.5 px-1">${dot}</td>`;
         });
         html += `</tr>`;
       });
-      html += `</tbody></table><div class="mt-3 pt-2.5 ml-4 border-t border-line sticky left-4 flex items-center gap-4 text-[11px] text-muted w-[calc(100%-1rem)]"><span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-forest"></span> Verildi</span><span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full border border-muted"></span> Es geçildi</span><span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-line"></span> Kayıt yok</span></div>`;
+      html += `</tbody></table><div class="mt-3 pt-2.5 ml-4 border-t border-line sticky left-4 flex items-center gap-4 text-[11px] text-muted w-[calc(100%-1rem)]"><span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-forest"></span> Verildi</span><span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full border border-muted"></span> Es geçildi</span><span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full border border-signal"></span> Verilmedi</span><span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-line"></span> Bekliyor</span></div>`;
       matrixEl.innerHTML = html;
 
       const feedEl = document.getElementById('history-feed');
       feedEl.innerHTML = '';
       days.forEach(d => {
         const dayLogs = logs[d.key] || {};
-        const entries = routines.map(r => ({ routine: r, log: dayLogs[r.id] })).filter(x => x.log);
+        const isPastDay = d.key < todayKey;
+        const entries = routines.filter(r => isActiveOn(r, d.key)).map(r => ({ routine: r, log: dayLogs[r.id], auto: !dayLogs[r.id] && isPastDay ? (r.priority === 'critical' ? 'missed' : 'auto') : null })).filter(x => x.log || x.auto);
         const card = document.createElement('div');
         card.className = 'bg-surface border border-line rounded-lg p-3.5';
-        let rows = entries.length === 0 ? `<p class="text-xs text-muted italic mt-1">Kayıt girilmemiş.</p>` : `<div class="mt-2 space-y-1.5">` + entries.map(({ routine, log }) => `
-          <div class="flex items-center justify-between text-xs"><span class="font-medium text-ink">${routine.name}</span><span class="font-mono text-[11px] ${log.status === 'done' ? 'text-forest' : 'text-muted'}">${log.status === 'done' ? `${log.by} · ${log.time}` : `Es geçildi (${log.by})`}</span></div>`).join('') + `</div>`;
+        let rows = entries.length === 0 ? `<p class="text-xs text-muted italic mt-1">Kayıt girilmemiş.</p>` : `<div class="mt-2 space-y-1.5">` + entries.map(({ routine, log, auto }) => `
+          <div class="flex items-center justify-between text-xs"><span class="font-medium text-ink">${routine.name}</span>${auto
+            ? (auto === 'missed' ? `<span class="font-mono text-[11px] text-signal">Verilmedi</span>` : `<span class="font-mono text-[11px] text-muted">Bugün yok (otomatik)</span>`)
+            : `<span class="font-mono text-[11px] ${log.status === 'done' ? 'text-forest' : 'text-muted'}">${log.status === 'done' ? (isSolo ? log.time : `${log.by} · ${log.time}`) : (isSolo ? 'Es geçildi' : `Es geçildi (${log.by})`)}</span>`}</div>`).join('') + `</div>`;
         card.innerHTML = `<div class="flex items-center justify-between border-b border-line/60 pb-2"><span class="text-xs font-bold text-ink">${d.fullLabel}</span><button onclick="jumpToDate('${d.key}')" class="font-mono text-[11px] text-muted hover:text-ink underline underline-offset-2">Güne git →</button></div>${rows}`;
         feedEl.appendChild(card);
       });
