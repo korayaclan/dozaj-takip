@@ -686,7 +686,7 @@
       const fromApp = sp.get('fc') ? { fc: sp.get('fc'), pr: sp.get('pr') || 'Anne', md: sp.get('md') } : null;
       history.replaceState(null, '', location.origin + location.pathname);
       let email = localStorage.getItem('dozaj_email_pending') || '';
-      if (!email) email = (prompt('Giriş için e-posta adresinizi yazın:') || '').trim();
+      if (!email) email = (await uiDialog({ title: 'E-posta adresiniz', text: 'Bağlantıyı istediğiniz adresi yazın.', ok: 'Giriş yap', input: 'email' })) || '';
       if (!email) { try { sessionStorage.setItem('dozaj_msg', 'E-posta adresi girilmediği için giriş tamamlanamadı. Bağlantıyı yeniden açın.'); } catch (x) {} return false; }
       let linkedNow = false;
       try {
@@ -741,6 +741,33 @@
     }
 
     // Yükleme perdesi: bulanık arka plan + dönen ikon
+    // Temaya uygun onay / giriş penceresi (tarayıcının kendi confirm/prompt kutusu yerine)
+    function uiDialog({ title, text = '', ok = 'Tamam', cancel = 'Vazgeç', danger = false, input = null }) {
+      return new Promise((resolve) => {
+        const wrap = document.createElement('div');
+        wrap.id = 'ui-dialog';
+        wrap.className = 'fixed inset-0 z-[110] flex items-center justify-center p-5 bg-ink/40 backdrop-blur-sm';
+        wrap.innerHTML = `<div role="dialog" aria-modal="true" class="w-full max-w-sm bg-surface border border-line rounded-2xl shadow-xl p-5">
+          <h3 class="text-base font-bold text-ink leading-snug">${title}</h3>
+          ${text ? `<p class="text-sm text-muted mt-2 leading-relaxed whitespace-pre-line">${text}</p>` : ''}
+          ${input ? `<input id="ui-dialog-input" type="${input}" autocomplete="email" class="mt-3 w-full px-3 py-2.5 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />` : ''}
+          <div class="mt-5 flex gap-2">
+            <button type="button" id="ui-dialog-cancel" class="flex-1 h-11 rounded-md border border-line bg-paper text-ink text-sm font-semibold hover:bg-white transition">${cancel}</button>
+            <button type="button" id="ui-dialog-ok" class="flex-1 h-11 rounded-md ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-ink hover:bg-neutral-800'} text-white text-sm font-semibold transition">${ok}</button>
+          </div></div>`;
+        document.body.appendChild(wrap);
+        const inp = wrap.querySelector('#ui-dialog-input');
+        const done = (v) => { document.removeEventListener('keydown', onKey); wrap.remove(); resolve(v); };
+        const accept = () => done(input ? (inp.value.trim() || null) : true);
+        const reject = () => done(input ? null : false);
+        const onKey = (e) => { if (e.key === 'Escape') reject(); else if (e.key === 'Enter' && input) accept(); };
+        document.addEventListener('keydown', onKey);
+        wrap.querySelector('#ui-dialog-ok').onclick = accept;
+        wrap.querySelector('#ui-dialog-cancel').onclick = reject;
+        wrap.addEventListener('click', (e) => { if (e.target === wrap) reject(); });
+        (inp || wrap.querySelector('#ui-dialog-ok')).focus();
+      });
+    }
     function showLoading(t) { document.getElementById('loading-text').textContent = t || 'Bağlanıyor...'; document.getElementById('loading-overlay').classList.remove('hidden'); }
     function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
 
@@ -872,7 +899,7 @@
     };
 
     window.addPartner = async () => {
-      if (!confirm(`Eş / aile eklensin mi?\n\nEşiniz uygulamada "Baba"yı seçip ${familyCode} koduyla giriş yapar. Bu telefon "Anne" olarak kalır ve kayıtlarınız korunur.`)) return;
+      if (!(await uiDialog({ title: 'Eş / aile eklensin mi?', text: `Eşiniz uygulamada "Baba"yı seçip ${familyCode} koduyla giriş yapar. Bu telefon "Anne" olarak kalır ve kayıtlarınız korunur.`, ok: 'Ekle' }))) return;
       await updateDoc(doc(db, 'families', familyCode), { mode: deleteField() });
       isSolo = false;
       localStorage.removeItem('dozaj_mode');
@@ -901,8 +928,8 @@
 
     let joining = false;
     let forceTakeover = false;
-    window.takeOverSession = () => {
-      if (!confirm('Bu telefon esas telefon olsun mu?\n\nBu profilin eski telefondaki oturumu kapanır (tek seferde yalnızca bir telefon açık kalır).')) return;
+    window.takeOverSession = async () => {
+      if (!(await uiDialog({ title: 'Bu telefon esas telefon olsun mu?', text: 'Bu profilin eski telefondaki oturumu kapanır (tek seferde yalnızca bir telefon açık kalır).', ok: 'Evet, bu telefon' }))) return;
       forceTakeover = true;
       document.getElementById('inp-join-code').form.requestSubmit();
     };
@@ -961,7 +988,7 @@
     };
 
     window.leaveFamily = async () => {
-      if (!confirm(isSolo ? `Bu telefondan çıkış yapılsın mı?\n\nKayıtlarınız silinmez; ${familyCode} koduyla tekrar giriş yapabilirsiniz.` : 'Bu cihazdaki aile kodundan çıkış yapılsın mı?')) return;
+      if (!(await uiDialog({ title: 'Çıkış yapılsın mı?', text: isSolo ? `Kayıtlarınız silinmez; ${familyCode} koduyla ya da hesabınızla tekrar giriş yapabilirsiniz.` : 'Bu telefon aile kodundan çıkar. Kayıtlar silinmez, kodla tekrar girebilirsiniz.', ok: 'Çıkış yap' }))) return;
       showLoading('Çıkış yapılıyor...');
       // Oturumu ve bildirim kaydını bırak ki bu profil başka telefonda açılabilsin.
       try {
@@ -1183,7 +1210,7 @@
         payload.status = status = 'done';
         const last = lastPrnDose(routine.id);
         if (routine.minHours && last && Date.now() - last.ts < routine.minHours * 3600000) {
-          if (!confirm(`Son doz ${agoText(last.ts)} verildi; en az ${routine.minHours} saat ara önerilmişti.\n\nYine de verilsin mi?`)) return;
+          if (!(await uiDialog({ title: 'Henüz erken olabilir', text: `Son doz ${agoText(last.ts)} verildi; en az ${routine.minHours} saat ara önerilmişti.`, ok: 'Yine de ver' }))) return;
         }
         const prev = (logs[selectedDateKey] || {})[routine.id];
         const doses = prev ? (prev.doses ? prev.doses.slice() : [{ by: prev.by, time: prev.time }]) : [];
@@ -1867,7 +1894,7 @@
     window.endRoutine = async (id) => {
       const r = routines.find(x => x.id === id);
       if (!r) return;
-      if (!confirm(`"${r.groupName || r.name}" sonlandırılsın mı?\n\nListeden kalkar ve hatırlatma gitmez. Geçmiş kayıtlar saklanır; "Yeniden başlat" ile geri açabilirsiniz.`)) return;
+      if (!(await uiDialog({ title: `"${r.groupName || r.name}" sonlandırılsın mı?`, text: 'Listeden kalkar ve hatırlatma gitmez. Geçmiş kayıtlar saklanır; "Yeniden başlat" ile geri açabilirsiniz.', ok: 'Sonlandır', danger: true }))) return;
       const today = getTodayKey();
       // Bugün zaten verilmişse bugün dahil, verilmemişse dünden itibaren bitmiş sayılır
       const y = new Date(); y.setDate(y.getDate() - 1);
