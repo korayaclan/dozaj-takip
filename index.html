@@ -559,7 +559,7 @@
         emailMsg(where, `Bağlantı ${email} adresine gönderildi. Postanızdan (gereksiz klasörüne de bakın) bağlantıya dokunun.`, true);
       } catch (err) {
         console.error(err);
-        emailMsg(where, 'Bağlantı gönderilemedi. Adresi kontrol edip tekrar deneyin.', false);
+        emailMsg(where, 'Bağlantı gönderilemedi (' + (err && (err.code || err.message) || 'bilinmeyen hata') + '). Adresi kontrol edip tekrar deneyin.', false);
       } finally { btn.disabled = false; }
     };
     function refreshEmailUI() {
