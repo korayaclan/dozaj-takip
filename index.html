@@ -86,49 +86,49 @@
   </div>
 
   <!-- EKRAN 0: EŞLEŞME (AİLE KODU) EKRANI -->
-  <div id="screen-onboarding" class="hidden max-w-md mx-auto px-5 pt-12">
+  <div id="screen-onboarding" class="hidden max-w-md mx-auto px-4 pt-6 pb-4 sm:pt-12">
     <p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">BAŞLANGIÇ</p>
-    <h1 class="text-2xl font-bold tracking-tight text-ink mt-1">Dozaj Takip</h1>
-    <p class="text-sm text-muted mt-2 leading-relaxed">
+    <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-ink mt-0.5">Dozaj Takip</h1>
+    <p class="text-[13px] text-muted mt-1.5 leading-snug">
       Şurup ve takviye dozlarınızı takip edin. Tek başınıza kullanabilir ya da eşinizle iki telefonda anlık senkronize edebilirsiniz.
     </p>
 
-    <div class="mt-6 bg-surface border border-ink rounded-xl p-5">
+    <div class="mt-4 bg-surface border border-ink rounded-xl p-4">
       <p class="text-sm font-bold text-ink">Tek başıma kullanacağım</p>
-      <p class="text-xs text-muted mt-1 leading-relaxed">Kayıtlar yalnızca sizin için tutulur. Eş ya da aile sonradan eklenebilir.</p>
-      <button onclick="createSoloAccount()" id="btn-create-solo" class="mt-3.5 w-full py-3 bg-ink text-white text-sm font-semibold rounded-md hover:bg-neutral-800 active:scale-[0.99] transition">
+      <p class="text-xs text-muted mt-0.5 leading-snug">Kayıtlar yalnızca sizin için tutulur. Eş ya da aile sonradan eklenebilir.</p>
+      <button onclick="createSoloAccount()" id="btn-create-solo" class="mt-3 w-full py-2.5 bg-ink text-white text-sm font-semibold rounded-md hover:bg-neutral-800 active:scale-[0.99] transition">
         Başla
       </button>
     </div>
 
-    <p class="mt-7 font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">AİLE İLE PAYLAŞ</p>
+    <p class="mt-5 font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">AİLE İLE PAYLAŞ</p>
 
-    <div class="mt-6 bg-surface border border-line rounded-xl p-5 space-y-5">
+    <div class="mt-2 bg-surface border border-line rounded-xl p-4 space-y-3">
       <!-- Kim Kullanıyor? -->
       <div>
-        <label class="block text-xs font-semibold text-ink mb-2">Bu telefon kimin?</label>
+        <label class="block text-xs font-semibold text-ink mb-1.5">Bu telefon kimin?</label>
         <div class="grid grid-cols-2 gap-2">
-          <button type="button" onclick="selectOnboardingProfile('Anne')" id="onb-anne" class="py-2.5 text-sm font-semibold rounded-md border border-ink bg-ink text-white transition">Anne</button>
-          <button type="button" onclick="selectOnboardingProfile('Baba')" id="onb-baba" class="py-2.5 text-sm font-semibold rounded-md border border-line bg-paper text-muted transition">Baba</button>
+          <button type="button" onclick="selectOnboardingProfile('Anne')" id="onb-anne" class="py-2 text-sm font-semibold rounded-md border border-ink bg-ink text-white transition">Anne</button>
+          <button type="button" onclick="selectOnboardingProfile('Baba')" id="onb-baba" class="py-2 text-sm font-semibold rounded-md border border-line bg-paper text-muted transition">Baba</button>
         </div>
       </div>
 
-      <div class="border-t border-line pt-4">
-        <button onclick="createNewFamily()" id="btn-create-fam" class="w-full py-3 bg-signal text-white text-sm font-semibold rounded-md hover:opacity-95 active:scale-[0.99] transition">
+      <div>
+        <button onclick="createNewFamily()" id="btn-create-fam" class="w-full py-2.5 bg-signal text-white text-sm font-semibold rounded-md hover:opacity-95 active:scale-[0.99] transition">
           Yeni Aile Kodu Oluştur
         </button>
       </div>
 
-      <div class="relative flex py-1 items-center">
+      <div class="relative flex items-center">
         <div class="flex-grow border-t border-line"></div>
         <span class="flex-shrink mx-3 text-[11px] font-mono text-muted uppercase">veya kodla giriş yap</span>
         <div class="flex-grow border-t border-line"></div>
       </div>
 
-      <form onsubmit="joinExistingFamily(event)" class="flex gap-2">
+      <form onsubmit="joinExistingFamily(event)" class="flex gap-2 min-w-0">
         <input id="inp-join-code" type="text" inputmode="numeric" pattern="[0-9]{3}-[0-9]{3}" autocomplete="off" maxlength="7" placeholder="482-915" required oninput="onJoinCodeInput(event)"
-          class="flex-1 px-3 py-2.5 text-lg font-mono tracking-widest bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
-        <button type="submit" id="btn-join-fam" class="px-4 py-2.5 bg-ink text-white text-xs font-semibold rounded-md hover:bg-neutral-800 transition">
+          class="flex-1 min-w-0 w-full px-3 py-2 text-lg font-mono tracking-widest bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+        <button type="submit" id="btn-join-fam" class="shrink-0 px-4 py-2 bg-ink text-white text-xs font-semibold rounded-md hover:bg-neutral-800 transition">
           Bağlan
         </button>
       </form>
@@ -136,7 +136,7 @@
       <button type="button" id="btn-takeover" onclick="takeOverSession()" class="hidden w-full py-2.5 border border-ink text-ink text-xs font-semibold rounded-md hover:bg-paper transition">Bu telefon geçsin, eski telefonu kapat</button>
     </div>
     <!-- Sosyal Bağlantılar -->
-    <footer class="mt-8 flex items-center justify-center gap-5 text-muted">
+    <footer class="mt-5 flex items-center justify-center gap-5 text-muted">
       <a href="https://github.com/korayaclan" target="_blank" rel="noopener noreferrer" aria-label="GitHub"
          class="hover:text-ink transition p-1">
         <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
@@ -156,7 +156,7 @@
   <div id="screen-app" class="hidden max-w-lg mx-auto px-4 pt-5">
     
     <!-- Üst Bar -->
-    <header class="flex items-center justify-between pb-4 border-b border-line">
+    <header class="flex flex-wrap items-center justify-between gap-x-2 gap-y-2.5 pb-4 border-b border-line">
       <div class="flex items-center gap-2">
         <span id="badge-profile" class="px-2.5 py-1 bg-ink text-white text-xs font-semibold rounded"></span>
         <button onclick="copyFamilyCode()" class="px-2 py-1 bg-line/60 hover:bg-line text-ink font-mono text-[11px] font-medium rounded transition flex items-center gap-1" title="Aile Kodunu Kopyala">
