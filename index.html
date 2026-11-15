@@ -1157,6 +1157,7 @@
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
         const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
         if (isIOS) add(isStandalone, 'iPhone: Ana Ekrandan açılmış', isStandalone ? '' : 'Safari sekmesinde bildirim çalışmaz');
+        add(!!navigator.vibrate, 'Titreşim desteği', navigator.vibrate ? (localStorage.getItem('dozaj_haptic') === 'off' ? 'uygulamada kapalı' : 'açık') : 'bu tarayıcı titreşimi desteklemiyor');
         add('Notification' in window, 'Tarayıcı bildirimi destekliyor');
         const perm = 'Notification' in window ? Notification.permission : 'yok';
         add(perm === 'granted', 'Bildirim izni', perm);
@@ -1489,14 +1490,14 @@
       return {
         enabled: () => localStorage.getItem('dozaj_haptic') !== 'off',
         supported: () => !!navigator.vibrate,
-        start() { lastAt = 0; if (can()) navigator.vibrate(12); },
+        start() { lastAt = 0; if (can()) navigator.vibrate(45); },
         tick(ts, pct) {
           if (!can()) return;
           const k = Math.min(Math.max(pct / 100, 0), 1);
-          const gap = 260 - 205 * k;
-          if (ts - lastAt >= gap) { lastAt = ts; navigator.vibrate(10 + 16 * k); }
+          const gap = 300 - 190 * k;
+          if (ts - lastAt >= gap) { lastAt = ts; navigator.vibrate(35 + 30 * k); }
         },
-        done() { if (can()) navigator.vibrate([30, 40, 30, 40, 160]); },
+        done() { if (can()) navigator.vibrate([60, 50, 60, 50, 250]); },
         stop() { if (navigator.vibrate) navigator.vibrate(0); }
       };
     })();
@@ -1508,7 +1509,7 @@
     window.toggleHaptic = () => {
       const on = !Haptic.enabled();
       localStorage.setItem('dozaj_haptic', on ? 'on' : 'off');
-      if (on && navigator.vibrate) navigator.vibrate(40);
+      if (on && navigator.vibrate) navigator.vibrate([80, 60, 120]);
       refreshHapticUI();
     };
     refreshHapticUI();
