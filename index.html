@@ -519,12 +519,8 @@
       });
     }
 
-    const DEFAULT_ROUTINES = [
-      { id: 'r_syrup_am', name: 'Sabah Şurubu', time: '07:45', note: 'Kritik doz', priority: 'critical', icon: 'syrup' },
-      { id: 'r_ravla', name: 'Ravla Zeytinyağı', time: '08:00', note: 'Her gün', priority: 'standard', allowSkip: false, icon: 'drop' },
-      { id: 'r_mollers', name: "Möller's Balık Yağı", time: '10:00–17:00', note: '', priority: 'standard', allowSkip: true, icon: 'capsule' },
-      { id: 'r_syrup_pm', name: 'Akşam Şurubu', time: '19:45', note: 'Kritik doz', priority: 'critical', icon: 'syrup' }
-    ];
+    // Yeni aile boş liste ile başlar; rutinleri kullanıcı kendisi ekler.
+    const DEFAULT_ROUTINES = [];
 
     // Rutinleri başlangıç saatine göre sırala. Aynı saatte tek saatli rutin, saat aralığından önce gelir.
     function startMinutes(time) {
