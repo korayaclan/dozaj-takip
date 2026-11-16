@@ -910,6 +910,8 @@
     };
 
     async function boot() {
+      // Tarayıcı eski kaydırma konumunu geri yüklerse sayfa üstten kırpık açılabiliyor
+      try { history.scrollRestoration = 'manual'; } catch (e) {}
       if (auth.authStateReady) await auth.authStateReady();
       if (!auth.currentUser) await signInAnonymously(auth);
       try { await handleEmailLink(); } catch (e) { console.error(e); }
@@ -1141,6 +1143,8 @@
       document.getElementById('screen-onboarding').classList.add('hidden');
       document.getElementById('screen-app').classList.remove('hidden');
       if (isSolo) routines = [];
+      window.scrollTo(0, 0);
+
       applySoloUI();
 
       checkNotificationUI();
