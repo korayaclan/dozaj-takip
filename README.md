@@ -18,7 +18,7 @@
 
 1. Siteyi telefonunuzdan açın.
 2. **Hemen başla** ile tek başınıza ya da **Aile ile paylaş** bölümünden eşinizle başlayın.
-3. Aile modunda ilk kişi bir kod alır (`123-456`), diğer kişi bu kodla bağlanır.
+3. Aile modunda ilk kişi "Davet" düğmesinden 8 haneli, 15 dakika geçerli, tek kullanımlık bir kod üretir; diğer kişi bu kodla bağlanır. Kayıtlara yalnızca üye hesaplar erişir. Telefon değişirse Google ile bağlı hesap yeterlidir.
 
 ## Gizlilik
 

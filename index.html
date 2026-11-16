@@ -148,18 +148,18 @@
 
       <div>
         <button onclick="createNewFamily()" id="btn-create-fam" class="w-full py-2.5 bg-signal text-white text-sm font-semibold rounded-md hover:opacity-95 active:scale-[0.99] transition">
-          Yeni Aile Kodu Oluştur
+          Yeni Aile Oluştur
         </button>
       </div>
 
       <div class="relative flex items-center">
         <div class="flex-grow border-t border-line"></div>
-        <span class="flex-shrink mx-3 text-[11px] font-mono text-muted uppercase">veya kodla giriş yap</span>
+        <span class="flex-shrink mx-3 text-[11px] font-mono text-muted uppercase">veya davet koduyla giriş yap</span>
         <div class="flex-grow border-t border-line"></div>
       </div>
 
       <form onsubmit="joinExistingFamily(event)" class="flex gap-2 min-w-0">
-        <input id="inp-join-code" type="text" inputmode="numeric" pattern="[0-9]{3}-[0-9]{3}" autocomplete="off" maxlength="7" placeholder="482-915" required oninput="onJoinCodeInput(event)"
+        <input id="inp-join-code" type="text" inputmode="numeric" autocomplete="off" maxlength="9" placeholder="1234-5678" required oninput="onJoinCodeInput(event)"
           class="flex-1 min-w-0 w-full px-3 py-2 text-lg font-mono tracking-widest bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
         <button type="submit" id="btn-join-fam" class="shrink-0 px-4 py-2 bg-ink text-white text-xs font-semibold rounded-md hover:bg-neutral-800 transition">
           Bağlan
@@ -192,8 +192,8 @@
     <header class="flex flex-wrap items-center justify-between gap-x-2 gap-y-2.5 pb-4 border-b border-line">
       <div class="flex items-center gap-2">
         <span id="badge-profile" class="px-2.5 py-1 bg-ink text-white text-xs font-semibold rounded"></span>
-        <button onclick="copyFamilyCode()" class="px-2 py-1 bg-line/60 hover:bg-line text-ink font-mono text-[11px] font-medium rounded transition flex items-center gap-1" title="Aile Kodunu Kopyala">
-          <span id="badge-code"></span>
+        <button onclick="showInvite()" class="px-2 py-1 bg-line/60 hover:bg-line text-ink text-[11px] font-medium rounded transition flex items-center gap-1" title="Aileden birini davet et">
+          <span>Davet</span>
           <svg class="w-3 h-3 text-muted" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75"/></svg>
         </button>
       </div>
@@ -271,7 +271,7 @@
         </button>
       </div>
       <div id="solo-footer" class="hidden mt-4 p-3 border border-line rounded-md bg-surface text-xs text-muted leading-relaxed">
-        <p>Kodunuz <span id="solo-code" class="font-mono font-semibold text-ink"></span>. Telefonu değiştirirseniz bu kodla giriş yaparsınız, bir yere not alın.</p>
+        <p id="solo-hint"></p>
         <button onclick="addPartner()" class="mt-2 font-semibold text-ink underline underline-offset-4">Eş / aile ekle</button>
       </div>
       <div id="email-footer" class="mt-4 p-3 border border-line rounded-md bg-surface text-xs text-muted leading-relaxed">
@@ -484,7 +484,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, signInAnonymously, isSignInWithEmailLink, sendSignInLinkToEmail, signInWithEmailLink, EmailAuthProvider, linkWithCredential, signOut, GoogleAuthProvider, signInWithPopup, linkWithPopup, signInWithCredential } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, doc, collection, getDoc, setDoc, updateDoc, deleteField, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, doc, collection, getDoc, setDoc, updateDoc, deleteField, onSnapshot, runTransaction, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
     import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
     // ========================================================
@@ -627,7 +627,6 @@
       document.getElementById('badge-profile').textContent = isSolo ? 'Sen' : nameOf(currentProfile);
       const ben = document.getElementById('btn-edit-names'); if (ben) ben.classList.toggle('hidden', isSolo);
       document.getElementById('solo-footer').classList.toggle('hidden', !isSolo);
-      document.getElementById('solo-code').textContent = familyCode;
       document.getElementById('notif-ask-text').textContent = isSolo ? 'Doz hatırlatmalarını almak için açın.' : 'Eşinizin onaylarını ve alarmları almak için açın.';
       document.getElementById('btn-leave').textContent = isSolo ? 'Bu telefondan çık' : 'Aile kodundan çık';
     }
@@ -677,7 +676,8 @@
       const btn = e.target.querySelector('button[type=submit]');
       btn.disabled = true;
       try {
-        const q = familyCode ? `?fc=${encodeURIComponent(familyCode)}&pr=${encodeURIComponent(currentProfile)}&md=${isSolo ? 'solo' : 'family'}` : '';
+        const iv = familyCode ? await createInvite(60) : null;
+        const q = iv ? `?iv=${encodeURIComponent(iv)}&pr=${encodeURIComponent(currentProfile)}&md=${isSolo ? 'solo' : 'family'}` : '';
         await sendSignInLinkToEmail(auth, email, { url: location.origin + location.pathname + q, handleCodeInApp: true });
         localStorage.setItem('dozaj_email_pending', email);
         emailMsg(where, `Bağlantı ${email} adresine gönderildi. Postanızdan (gereksiz klasörüne de bakın) bağlantıya dokunun.`, true);
@@ -691,6 +691,8 @@
       document.getElementById('email-linked').classList.toggle('hidden', !linked);
       document.getElementById('email-add').classList.toggle('hidden', linked);
       if (linked) document.getElementById('email-linked-addr').textContent = auth.currentUser.email;
+      const sh = document.getElementById('solo-hint');
+      if (sh) sh.textContent = linked ? 'Telefonu değiştirirseniz yeni telefonda aynı hesapla giriş yapmanız yeterli.' : 'Telefonu değiştirirseniz kayıtlarınıza dönebilmek için aşağıdan Google ile hesabınızı bağlayın.';
     }
     async function saveUserDoc() {
       if (!isLinked() || !familyCode) return;
@@ -698,12 +700,77 @@
         await setDoc(doc(db, 'users', auth.currentUser.uid), { email: auth.currentUser.email, familyCode, profile: currentProfile, mode: isSolo ? 'solo' : 'family', updatedAt: Date.now() }, { merge: true });
       } catch (e) { console.error(e); }
     }
+    // --- ÜYELİK VE DAVET ---
+    // Aile belgesine yalnızca "members" listesindeki hesaplar (uid) erişir. Yeni telefon ya davet koduyla
+    // ya da bağlı hesapla (Google / e-posta) aynı uid'e dönerek girer.
+    const newFamilyId = () => Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) => b.toString(16).padStart(2, '0')).join('');
+    const fmtInvite = (c) => c.slice(0, 4) + '-' + c.slice(4);
+    async function createInvite(minutes = 15) {
+      for (let i = 0; i < 5; i++) {
+        const c = String(crypto.getRandomValues(new Uint32Array(1))[0] % 100000000).padStart(8, '0');
+        try {
+          await setDoc(doc(db, 'invites', c), { familyId: familyCode, createdBy: auth.currentUser.uid, exp: Date.now() + minutes * 60000 });
+          return c;
+        } catch (e) { if (i === 4) throw e; }
+      }
+    }
+    async function redeemInvite(code) {
+      let inv;
+      try { inv = await getDoc(doc(db, 'invites', code)); } catch (e) { return { ok: false, reason: 'error' }; }
+      if (!inv.exists() || (inv.data().exp || 0) < Date.now()) return { ok: false, reason: 'invalid' };
+      const fid = inv.data().familyId, uid = auth.currentUser.uid;
+      const b = writeBatch(db);
+      b.update(doc(db, 'families', fid), { ['members.' + uid]: true, joinInvite: code });
+      b.delete(doc(db, 'invites', code));
+      try { await b.commit(); } catch (e) { console.error(e); return { ok: false, reason: e && e.code === 'permission-denied' ? 'invalid' : 'error' }; }
+      return { ok: true, familyId: fid };
+    }
+    // 'ok' | 'denied' | 'missing'. Eski (üyesiz) aileyi ilk açan hesap sahiplenir.
+    async function ensureMembership(id) {
+      const uid = auth.currentUser.uid;
+      let snap;
+      try { snap = await getDoc(doc(db, 'families', id)); }
+      catch (e) { if (e && e.code === 'permission-denied') return 'denied'; throw e; }
+      if (!snap.exists()) return 'missing';
+      const m = snap.data().members;
+      if (!m) { await updateDoc(doc(db, 'families', id), { members: { [uid]: true } }); return 'ok'; }
+      return m[uid] ? 'ok' : 'denied';
+    }
+    function lockedOut() {
+      try { sessionStorage.setItem('dozaj_msg', 'Bu aileye erişiminiz yok: bu telefondaki oturum aile üyeleri arasında değil. Daha önce bağladığınız hesapla (Google / e-posta) giriş yapın ya da aile telefonundan yeni bir davet kodu isteyin.'); } catch (e) {}
+      localStorage.removeItem('dozaj_family_code'); localStorage.removeItem('dozaj_mode');
+      location.reload();
+    }
+    window.showInvite = async () => {
+      showLoading('Davet kodu hazırlanıyor...');
+      let c;
+      try { c = await createInvite(15); } catch (e) { console.error(e); hideLoading(); showToast('Davet kodu oluşturulamadı', 'HATA'); return; }
+      hideLoading();
+      const ok = await uiDialog({ title: 'Davet kodu: ' + fmtInvite(c), text: 'Eşinizin ya da aileden birinin telefonunda "kodla giriş yap" alanına bu kodu yazın. 15 dakika geçerli ve tek kullanımlıktır.', ok: 'Kopyala', cancel: 'Kapat' });
+      if (ok) { try { await navigator.clipboard?.writeText(c); } catch (e) {} showToast('Davet kodu kopyalandı', 'KOD'); }
+    };
+    // Kayıtlı hesabın (users/{uid}) ailesini bu telefona yükler. true = yüklendi.
+    async function restoreFromUserDoc(d) {
+      if (!d || !d.familyCode) return false;
+      try {
+        if (await ensureMembership(d.familyCode) !== 'ok') return false;
+        const fam = await getDoc(doc(db, 'families', d.familyCode));
+        if (!fam.exists()) return false;
+        familyCode = d.familyCode; currentProfile = d.profile || 'Anne';
+        isSolo = d.mode === 'solo' || fam.data().mode === 'solo';
+        localStorage.setItem('dozaj_family_code', familyCode);
+        localStorage.setItem('dozaj_profile', currentProfile);
+        if (isSolo) localStorage.setItem('dozaj_mode', 'solo'); else localStorage.removeItem('dozaj_mode');
+        await claimSession(familyCode, currentProfile, true);
+        return true;
+      } catch (err) { console.error(err); return false; }
+    }
     // Postadaki bağlantıdan dönüldüğünde çalışır. true = hesap kaydından aile yüklendi.
     async function handleEmailLink() {
       if (!isSignInWithEmailLink(auth, location.href)) return false;
       const href = location.href;
       const sp = new URLSearchParams(location.search);
-      const fromApp = sp.get('fc') ? { fc: sp.get('fc'), pr: sp.get('pr') || 'Anne', md: sp.get('md') } : null;
+      const fromApp = sp.get('iv') ? { iv: sp.get('iv'), pr: sp.get('pr') || 'Anne', md: sp.get('md') } : null;
       history.replaceState(null, '', location.origin + location.pathname);
       let email = localStorage.getItem('dozaj_email_pending') || '';
       if (!email) email = (await uiDialog({ title: 'E-posta adresiniz', text: 'Bağlantıyı istediğiniz adresi yazın.', ok: 'Giriş yap', input: 'email' })) || '';
@@ -730,10 +797,12 @@
       // hesabı o aileye bağla, bu tarayıcıda oturum açma (uygulamadaki oturum bozulmasın)
       if (fromApp && !familyCode) {
         try {
-          const fam = await getDoc(doc(db, 'families', fromApp.fc));
-          if (fam.exists()) {
-            await setDoc(doc(db, 'users', auth.currentUser.uid), { email: auth.currentUser.email, familyCode: fromApp.fc, profile: fromApp.pr, mode: fromApp.md === 'solo' ? 'solo' : 'family', updatedAt: Date.now() }, { merge: true });
+          const r = await redeemInvite(fromApp.iv);
+          if (r.ok) {
+            await setDoc(doc(db, 'users', auth.currentUser.uid), { email: auth.currentUser.email, familyCode: r.familyId, profile: fromApp.pr, mode: fromApp.md === 'solo' ? 'solo' : 'family', updatedAt: Date.now() }, { merge: true });
             try { sessionStorage.setItem('dozaj_ok', 'E-posta hesabınıza bağlandı. Dozaj uygulamasına dönebilirsiniz; yeni bir telefonda bu e-postayla giriş yapabilirsiniz.'); } catch (x) {}
+          } else {
+            try { sessionStorage.setItem('dozaj_msg', 'Bağlantıdaki davet süresi dolmuş. Uygulamadan e-posta bağlantısını yeniden isteyin.'); } catch (x) {}
           }
         } catch (err) { console.error(err); }
         return false;
@@ -741,22 +810,10 @@
       if (linkedNow) { await saveUserDoc(); return false; }
       try {
         const u = await getDoc(doc(db, 'users', auth.currentUser.uid));
-        if (u.exists() && u.data().familyCode) {
-          const d = u.data();
-          const fam = await getDoc(doc(db, 'families', d.familyCode));
-          if (fam.exists()) {
-            familyCode = d.familyCode; currentProfile = d.profile || 'Anne';
-            isSolo = d.mode === 'solo' || fam.data().mode === 'solo';
-            localStorage.setItem('dozaj_family_code', familyCode);
-            localStorage.setItem('dozaj_profile', currentProfile);
-            if (isSolo) localStorage.setItem('dozaj_mode', 'solo'); else localStorage.removeItem('dozaj_mode');
-            await claimSession(familyCode, currentProfile, true);
-            return true;
-          }
-        }
+        if (u.exists() && await restoreFromUserDoc(u.data())) return true;
       } catch (err) { console.error(err); }
       if (familyCode) await saveUserDoc();
-      else { try { sessionStorage.setItem('dozaj_ok', auth.currentUser.email + ' ile giriş yapıldı ama bu e-posta henüz bir aileye bağlı değil. Aile kodunuzla bağlanın; e-posta otomatik eklenir.'); } catch (x) {} }
+      else { try { sessionStorage.setItem('dozaj_ok', auth.currentUser.email + ' ile giriş yapıldı ama bu e-posta henüz bir aileye bağlı değil. Yeni bir takip başlatın ya da davet koduyla bağlanın; e-posta otomatik eklenir.'); } catch (x) {} }
       return false;
     }
 
@@ -834,7 +891,11 @@
           catch (err) {
             // Bu Google hesabı daha önce başka bir kayıtla kullanılmış: o hesaba geç, aileyi ona bağla
             const cred = GoogleAuthProvider.credentialFromError(err);
-            if (err && err.code === 'auth/credential-already-in-use' && cred) await signInWithCredential(auth, cred);
+            if (err && err.code === 'auth/credential-already-in-use' && cred) {
+              const iv = familyCode ? await createInvite(15) : null;
+              await signInWithCredential(auth, cred);
+              if (iv) { const r = await redeemInvite(iv); if (!r.ok) throw new Error('invite-failed'); }
+            }
             else throw err;
           }
           await saveUserDoc(); refreshEmailUI();
@@ -843,21 +904,8 @@
         }
         await signInWithPopup(auth, provider);
         const u = await getDoc(doc(db, 'users', auth.currentUser.uid));
-        if (u.exists() && u.data().familyCode) {
-          const d = u.data();
-          const fam = await getDoc(doc(db, 'families', d.familyCode));
-          if (fam.exists()) {
-            familyCode = d.familyCode; currentProfile = d.profile || 'Anne';
-            isSolo = d.mode === 'solo' || fam.data().mode === 'solo';
-            localStorage.setItem('dozaj_family_code', familyCode);
-            localStorage.setItem('dozaj_profile', currentProfile);
-            if (isSolo) localStorage.setItem('dozaj_mode', 'solo'); else localStorage.removeItem('dozaj_mode');
-            await claimSession(familyCode, currentProfile, true);
-            startSyncedApp();
-            return;
-          }
-        }
-        emailMsg('onb', auth.currentUser.email + ' ile giriş yapıldı ama bu hesap henüz bir aileye bağlı değil. Aile kodunuzla bağlanın; hesap otomatik eklenir.', true);
+        if (u.exists() && await restoreFromUserDoc(u.data())) { startSyncedApp(); return; }
+        emailMsg('onb', auth.currentUser.email + ' ile giriş yapıldı ama bu hesap henüz bir aileye bağlı değil. Yeni bir takip başlatın ya da davet koduyla bağlanın; hesap otomatik eklenir.', true);
       } catch (err) {
         console.error(err);
         if (err && err.code === 'auth/popup-closed-by-user') return;
@@ -873,6 +921,10 @@
         navigator.serviceWorker.register('./firebase-messaging-sw.js').catch(console.error);
       }
       if (familyCode) {
+        // Üyelik: eski aileyi ilk açan hesap sahiplenir; üye olmayan hesap içeri alınmaz.
+        let mem = 'ok';
+        try { mem = await ensureMembership(familyCode); } catch (e) { console.error(e); mem = 'offline'; }
+        if (mem === 'denied') { lockedOut(); return; }
         // Çevrimdışıysa oturum kontrolü yapılamaz; kullanıcıyı dışarıda bırakmamak için devam et.
         const r = await claimSession(familyCode, currentProfile).catch(() => ({ ok: true, offline: true }));
         if (!r.ok) { kickOut(); return; }
@@ -933,10 +985,11 @@
     window.createSoloAccount = async () => {
       const btn = document.getElementById('btn-create-solo');
       btn.disabled = true; btn.textContent = 'Hazırlanıyor...';
-      const code = `${Math.floor(100 + Math.random() * 900)}-${Math.floor(100 + Math.random() * 900)}`;
+      const code = newFamilyId();
       try {
         await setDoc(doc(db, 'families', code), {
           createdAt: Date.now(),
+          members: { [auth.currentUser.uid]: true },
           mode: 'solo',
           routines: [],
           tokens: {},
@@ -960,21 +1013,21 @@
     };
 
     window.addPartner = async () => {
-      if (!(await uiDialog({ title: 'Eş / aile eklensin mi?', text: `Eşiniz uygulamada "Baba"yı seçip ${familyCode} koduyla giriş yapar. Bu telefon "Anne" olarak kalır ve kayıtlarınız korunur.`, ok: 'Ekle' }))) return;
+      if (!(await uiDialog({ title: 'Eş / aile eklensin mi?', text: 'Eşiniz uygulamada "Baba"yı seçip size göstereceğimiz davet koduyla giriş yapar. Bu telefon "Anne" olarak kalır ve kayıtlarınız korunur.', ok: 'Ekle' }))) return;
       await updateDoc(doc(db, 'families', familyCode), { mode: deleteField() });
       isSolo = false;
       localStorage.removeItem('dozaj_mode');
       applySoloUI(); renderRoutine();
-      navigator.clipboard?.writeText(familyCode);
-      showToast(`Eşiniz bu kodla katılabilir: ${familyCode}`, 'KOD');
+      await showInvite();
     };
 
     window.createNewFamily = async () => {
       const btn = document.getElementById('btn-create-fam');
       btn.disabled = true; btn.textContent = 'Oluşturuluyor...';
-      const code = `${Math.floor(100 + Math.random() * 900)}-${Math.floor(100 + Math.random() * 900)}`;
+      const code = newFamilyId();
       await setDoc(doc(db, 'families', code), {
         createdAt: Date.now(),
+        members: { [auth.currentUser.uid]: true },
         ...customNames(),
         routines: DEFAULT_ROUTINES,
         tokens: {},
@@ -989,6 +1042,7 @@
     };
 
     let joining = false;
+    let pendingJoin = null;
     let forceTakeover = false;
     window.takeOverSession = async () => {
       if (!(await uiDialog({ title: 'Bu telefon esas telefon olsun mu?', text: 'Bu profilin eski telefondaki oturumu kapanır (tek seferde yalnızca bir telefon açık kalır).', ok: 'Evet, bu telefon' }))) return;
@@ -997,10 +1051,10 @@
     };
     window.onJoinCodeInput = (e) => {
       const inp = e.target;
-      const d = inp.value.replace(/\D/g, '').slice(0, 6);
+      const d = inp.value.replace(/\D/g, '').slice(0, 8);
       const deleting = !!(e.inputType && e.inputType.startsWith('delete'));
-      inp.value = d.length > 3 ? `${d.slice(0, 3)}-${d.slice(3)}` : (d.length === 3 && !deleting ? `${d}-` : d);
-      if (d.length === 6 && inp.form) inp.form.requestSubmit();
+      inp.value = d.length > 4 ? `${d.slice(0, 4)}-${d.slice(4)}` : (d.length === 4 && !deleting ? `${d}-` : d);
+      if (d.length === 8 && inp.form) inp.form.requestSubmit();
     };
     window.joinExistingFamily = async (e) => {
       if (joining) { e.preventDefault(); return; }
@@ -1011,13 +1065,23 @@
       e.preventDefault();
       const errEl = document.getElementById('onb-error');
       errEl.classList.add('hidden');
-      const raw = document.getElementById('inp-join-code').value.trim().toUpperCase();
-      const famSnap = await getDoc(doc(db, 'families', raw));
-      if (!famSnap.exists()) {
-        errEl.textContent = 'Bu aile kodu bulunamadı. Kodu kontrol edin.';
-        errEl.classList.remove('hidden');
-        return;
-      }
+      const digits = document.getElementById('inp-join-code').value.replace(/\D/g, '');
+      const showErr = (t) => { errEl.textContent = t; errEl.classList.remove('hidden'); };
+      let raw;
+      if (pendingJoin && pendingJoin.digits === digits) raw = pendingJoin.familyId;
+      else if (digits.length === 8) {
+        // Davet kodu: tek kullanımlık; katılınca üyelik yazılır
+        const r = await redeemInvite(digits);
+        if (!r.ok) { showErr(r.reason === 'error' ? 'Bağlantı kurulamadı. İnternetinizi kontrol edip tekrar deneyin.' : 'Davet kodu geçersiz ya da süresi dolmuş. Aile telefonundan yeni bir kod isteyin.'); return; }
+        raw = r.familyId; pendingJoin = { digits, familyId: raw };
+      } else if (digits.length === 6) raw = `${digits.slice(0, 3)}-${digits.slice(3)}`; // eski 6 haneli aile kodu
+      else { showErr('Davet kodu 8 haneli olmalı.'); return; }
+      let famSnap;
+      try {
+        if (await ensureMembership(raw) === 'denied') { showErr('Bu aile artık davet koduyla giriliyor. Aile telefonunda üstteki "Davet" düğmesinden kod alın.'); return; }
+        famSnap = await getDoc(doc(db, 'families', raw));
+      } catch (err) { console.error(err); showErr('Bağlantı kurulamadı. İnternetinizi kontrol edip tekrar deneyin.'); return; }
+      if (!famSnap.exists()) { showErr('Bu kod bulunamadı. Kodu kontrol edin.'); return; }
       setNames(famSnap.data().names); applyNamesUI();
       // Tek kullanıcı hesabıysa profil seçimi gerekmez
       const soloDoc = famSnap.data().mode === 'solo';
@@ -1041,6 +1105,7 @@
         errEl.classList.remove('hidden');
         return;
       }
+      pendingJoin = null;
       familyCode = raw;
       currentProfile = onboardingProfile;
       isSolo = soloDoc; if (soloDoc) routines = [];
@@ -1051,7 +1116,9 @@
     };
 
     window.leaveFamily = async () => {
-      if (!(await uiDialog({ title: 'Çıkış yapılsın mı?', text: (isSolo ? `Kayıtlarınız silinmez; ${familyCode} koduyla ya da hesabınızla tekrar giriş yapabilirsiniz.` : 'Bu telefon aile kodundan çıkar. Kayıtlar silinmez, kodla tekrar girebilirsiniz.') + (isLinked() ? '\nHesabınızdan (' + auth.currentUser.email + ') da çıkılır; sonra aynı hesapla tekrar girebilirsiniz.' : ''), ok: 'Çıkış yap' }))) return;
+      if (!(await uiDialog({ title: 'Çıkış yapılsın mı?', text: isLinked()
+        ? 'Kayıtlar silinmez. Hesabınızdan (' + auth.currentUser.email + ') da çıkılır; aynı hesapla tekrar girebilirsiniz.'
+        : (isSolo ? 'Hesabınız bağlı olmadığı için çıkarsanız bu kayıtlara bir daha ulaşamazsınız. Önce aşağıdan Google ile bağlamanız önerilir.' : 'Hesabınız bağlı olmadığı için tekrar girmek istediğinizde aile telefonundan yeni bir davet kodu almanız gerekir. Kayıtlar silinmez.'), ok: isLinked() ? 'Çıkış yap' : 'Yine de çık', danger: !isLinked() && isSolo }))) return;
       showLoading('Çıkış yapılıyor...');
       // Oturumu ve bildirim kaydını bırak ki bu profil başka telefonda açılabilsin.
       try {
@@ -1072,17 +1139,11 @@
       location.reload();
     };
 
-    window.copyFamilyCode = () => {
-      navigator.clipboard?.writeText(familyCode);
-      showToast(`Aile kodu kopyalandı: ${familyCode}`, 'KOD');
-    };
-
     // --- CANLI SENKRONİZASYON ---
     function startSyncedApp() {
       hideLoading(); refreshEmailUI(); saveUserDoc();
       document.getElementById('screen-onboarding').classList.add('hidden');
       document.getElementById('screen-app').classList.remove('hidden');
-      document.getElementById('badge-code').textContent = familyCode;
       if (isSolo) routines = [];
       applySoloUI();
 
@@ -1112,7 +1173,7 @@
           if (activeTab === 'routine') renderRoutine();
           else renderHistory();
         }
-      });
+      }, (err) => { console.error(err); if (err && err.code === 'permission-denied') lockedOut(); });
 
       // 2. Günlük kayıtları canlı dinle
       unsubLogs = onSnapshot(collection(db, 'families', familyCode, 'logs'), (snap) => {
@@ -1121,7 +1182,7 @@
         logs = nextLogs;
         if (activeTab === 'routine') renderRoutine();
         else renderHistory();
-      });
+      }, (err) => { console.error(err); if (err && err.code === 'permission-denied') lockedOut(); });
     }
 
     // --- BİLDİRİM İZNİ & TOKEN KAYDI (iOS + Android Uyumlu) ---

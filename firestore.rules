@@ -7,30 +7,90 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Aile / hesap belgesi.
-    // - Yalnızca tek tek okunabilir ("get"); koleksiyon listelenemez,
-    //   yani birisi tüm aile kodlarını toplu çekemez.
-    // - Kod biçimi 123-456 olmalı, belge silinemez, bilinen alanlar dışında alan eklenemez.
+    // Aile belgesine erişim: belgede "members" varsa yalnızca üyeler;
+    // eski (members alanı olmayan) belgeler ilk açan cihaz tarafından sahiplenilene kadar açık kalır.
+    function famPath(id) {
+      return /databases/$(database)/documents/families/$(id);
+    }
+    function canAccess(id) {
+      return exists(famPath(id))
+        && (!('members' in get(famPath(id)).data) || request.auth.uid in get(famPath(id)).data.members);
+    }
+    function isMember(id) {
+      return exists(famPath(id))
+        && 'members' in get(famPath(id)).data
+        && request.auth.uid in get(famPath(id)).data.members;
+    }
+
+    // Aile belgesi.
+    // - Yalnızca tek tek okunabilir ("get"); koleksiyon listelenemez.
+    // - Yeni aileler rastgele 20 karakterlik kimlikle ve kurucu üye olarak açılır.
+    // - Üye olmayan biri yalnızca geçerli bir davet koduyla kendini üye olarak ekleyebilir.
     match /families/{code} {
-      allow get: if request.auth != null;
+      allow get: if request.auth != null
+        && (resource == null
+            || !('members' in resource.data)
+            || request.auth.uid in resource.data.members);
       allow list: if false;
+
       allow create: if request.auth != null
-        && code.matches('^[0-9]{3}-[0-9]{3}$')
-        && request.resource.data.keys().hasOnly(['createdAt', 'mode', 'names', 'routines', 'tokens', 'sessions']);
+        && code.matches('^[0-9a-f]{20}$')
+        && request.resource.data.keys().hasOnly(['createdAt', 'mode', 'names', 'routines', 'tokens', 'sessions', 'members'])
+        && request.resource.data.members.keys().hasOnly([request.auth.uid])
+        && request.resource.data.members[request.auth.uid] == true;
+
       allow update: if request.auth != null
-        && request.resource.data.keys().hasOnly(['createdAt', 'mode', 'names', 'routines', 'tokens', 'sessions'])
+        && request.resource.data.keys().hasOnly(['createdAt', 'mode', 'names', 'routines', 'tokens', 'sessions', 'members', 'joinInvite'])
         && (!('routines' in request.resource.data) || request.resource.data.routines.size() <= 200)
         && (!('names' in request.resource.data) || (
               request.resource.data.names.keys().hasOnly(['Anne', 'Baba'])
               && request.resource.data.names.get('Anne', '').size() <= 12
-              && request.resource.data.names.get('Baba', '').size() <= 12));
+              && request.resource.data.names.get('Baba', '').size() <= 12))
+        && (
+          // 1) Üye kendi ailesini günceller (üye listesi değişmez).
+          ('members' in resource.data
+            && request.auth.uid in resource.data.members
+            && request.resource.data.members == resource.data.members)
+          // 2) Eski belge: ilk açan cihaz kendini tek üye olarak yazar.
+          || (!('members' in resource.data)
+              && (!('members' in request.resource.data)
+                  || (request.resource.data.members.keys().hasOnly([request.auth.uid])
+                      && request.resource.data.members[request.auth.uid] == true)))
+          // 3) Davet koduyla katılım: yalnızca kendini ekler.
+          || ('members' in resource.data
+              && !(request.auth.uid in resource.data.members)
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'joinInvite'])
+              && request.resource.data.members.diff(resource.data.members).affectedKeys().hasOnly([request.auth.uid])
+              && request.resource.data.members[request.auth.uid] == true
+              && get(/databases/$(database)/documents/invites/$(request.resource.data.joinInvite)).data.familyId == code
+              && get(/databases/$(database)/documents/invites/$(request.resource.data.joinInvite)).data.exp > request.time.toMillis())
+        );
       allow delete: if false;
 
-      // Günlük kayıtlar (YYYY-MM-DD).
+      // Günlük kayıtlar (YYYY-MM-DD): yalnızca ailenin üyeleri.
       match /logs/{day} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+        allow read: if request.auth != null && canAccess(code);
+        allow write: if request.auth != null && canAccess(code)
+          && day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
       }
+    }
+
+    // Davet kodları: 8 haneli, kısa ömürlü, tek kullanımlık.
+    // Üye oluşturur; kodu bilen okur; katılım başarılı olunca (aynı işlemde) silinir.
+    match /invites/{inv} {
+      allow get: if request.auth != null && inv.matches('^[0-9]{8}$');
+      allow list: if false;
+      allow create: if request.auth != null
+        && inv.matches('^[0-9]{8}$')
+        && request.resource.data.keys().hasOnly(['familyId', 'createdBy', 'exp'])
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.exp is number
+        && request.resource.data.exp <= request.time.toMillis() + 3900000
+        && isMember(request.resource.data.familyId);
+      allow update: if false;
+      allow delete: if request.auth != null
+        && (resource.data.createdBy == request.auth.uid
+            || request.auth.uid in getAfter(famPath(resource.data.familyId)).data.members);
     }
 
     // Geri kalan her şey kapalı.
