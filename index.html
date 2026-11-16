@@ -1886,7 +1886,7 @@
 
       const matrixEl = document.getElementById('history-matrix');
       // Bugün rutin adlarının hemen sağında, geçmiş günler sağa doğru uzar. Rutin sütunu kaydırırken sabit kalır.
-      const stickyCls = 'sticky left-0 z-10 bg-surface shadow-[1px_0_0_0_#E4E2DC]';
+      const stickyCls = 'sticky left-0 z-10 bg-surface';
       let html = `<table class="w-full text-left border-collapse"><thead><tr><th class="${stickyCls} pl-4 pr-3 text-[11px] font-semibold text-muted pb-2 whitespace-nowrap">Rutin</th>`;
       days.forEach(d => {
         html += `<th class="text-center pb-2 px-1"><button onclick="jumpToDate('${d.key}')" class="hover:bg-paper rounded px-1 py-0.5"><span class="block font-mono text-[10px] text-muted">${d.dayShort}</span><span class="block font-mono text-[11px] font-semibold ${d.key === todayKey ? 'text-signal' : 'text-ink'}">${d.dayNum}</span>${spans && d.dayNum === 1 ? `<span class="block font-mono text-[9px] text-muted">${parseDateKey(d.key).toLocaleDateString('tr-TR', { month: 'short' })}</span>` : ''}</button></th>`;
