@@ -847,7 +847,7 @@
 
     // Yükleme perdesi: bulanık arka plan + dönen ikon
     // Temaya uygun onay / giriş penceresi (tarayıcının kendi confirm/prompt kutusu yerine)
-    function uiDialog({ title, text = '', ok = 'Tamam', cancel = 'Vazgeç', danger = false, input = null }) {
+    function uiDialog({ title, text = '', ok = 'Tamam', cancel = 'Vazgeç', danger = false, input = null, value = '', placeholder = '', maxlength = 0, allowEmpty = false }) {
       return new Promise((resolve) => {
         const wrap = document.createElement('div');
         wrap.id = 'ui-dialog';
@@ -855,15 +855,15 @@
         wrap.innerHTML = `<div role="dialog" aria-modal="true" class="w-full max-w-sm bg-surface border border-line rounded-2xl shadow-xl p-5">
           <h3 class="text-base font-bold text-ink leading-snug">${title}</h3>
           ${text ? `<p class="text-sm text-muted mt-2 leading-relaxed whitespace-pre-line">${text}</p>` : ''}
-          ${input ? `<input id="ui-dialog-input" type="${input}" autocomplete="email" class="mt-3 w-full px-3 py-2.5 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />` : ''}
+          ${input ? `<input id="ui-dialog-input" type="${input}" autocomplete="${input === 'email' ? 'email' : 'off'}" ${maxlength ? `maxlength="${maxlength}"` : ''} placeholder="${placeholder}" class="mt-3 w-full px-3 py-2.5 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />` : ''}
           <div class="mt-5 flex gap-2">
             <button type="button" id="ui-dialog-cancel" class="flex-1 h-11 rounded-md border border-line bg-paper text-ink text-sm font-semibold hover:bg-white transition">${cancel}</button>
             <button type="button" id="ui-dialog-ok" class="flex-1 h-11 rounded-md ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-ink hover:bg-neutral-800'} text-white text-sm font-semibold transition">${ok}</button>
           </div></div>`;
         document.body.appendChild(wrap);
-        const inp = wrap.querySelector('#ui-dialog-input');
+        const inp = wrap.querySelector('#ui-dialog-input'); if (inp && value) inp.value = value;
         const done = (v) => { document.removeEventListener('keydown', onKey); wrap.remove(); resolve(v); };
-        const accept = () => done(input ? (inp.value.trim() || null) : true);
+        const accept = () => done(input ? (allowEmpty ? inp.value.trim() : (inp.value.trim() || null)) : true);
         const reject = () => done(input ? null : false);
         const onKey = (e) => { if (e.key === 'Escape') reject(); else if (e.key === 'Enter' && input) accept(); };
         document.addEventListener('keydown', onKey);
@@ -1284,15 +1284,15 @@
     // Tüm kayıtları Excel / Google E-Tablolar'da açılabilen CSV olarak indirir (yedek ve doktora göstermek için)
     window.exportRecords = () => {
       const esc = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
-      const rows = [['Tarih', 'İlaç', 'Planlanan saat', 'Durum', 'Kim', 'Verildiği saat']];
+      const rows = [['Tarih', 'İlaç', 'Planlanan saat', 'Durum', 'Kim', 'Verildiği saat', 'Not']];
       Object.keys(logs).sort().forEach(day => {
         const dl = logs[day] || {};
         routines.forEach(r => {
           const e = dl[r.id];
           if (!e) return;
           const status = e.status === 'skipped' ? 'Es geçildi' : 'Verildi';
-          if (r.asNeeded && e.doses && e.doses.length) e.doses.forEach(d => rows.push([day, r.groupName || r.name, r.time, status, isSolo ? '' : nameOf(d.by), d.time]));
-          else rows.push([day, r.name, r.time, status, isSolo ? '' : nameOf(e.by), e.time]);
+          if (r.asNeeded && e.doses && e.doses.length) e.doses.forEach(d => rows.push([day, r.groupName || r.name, r.time, status, isSolo ? '' : nameOf(d.by), d.time, e.note || '']));
+          else rows.push([day, r.name, r.time, status, isSolo ? '' : nameOf(e.by), e.time, e.note || '']);
         });
       });
       if (rows.length === 1) { showToast('İndirilecek kayıt yok', 'BİLGİ'); return; }
@@ -1302,6 +1302,27 @@
       a.download = `dozaj-kayitlari-${getTodayKey()}.csv`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    };
+
+    // --- HIZLI NOT ---
+    // Doz kaydına tek satırlık not ("kusmuş", "yarım içti"). Ailenin her üyesi bugünün kayıtlarına not ekleyebilir.
+    const NOTE_MAX = 80;
+    const noteBtnCls = 'text-[11px] font-medium text-muted hover:text-ink underline underline-offset-2';
+    function noteHtml(routineId, entry, canEdit) {
+      if (!entry) return '';
+      const n = entry.note ? `<span class="text-[11px] italic text-ink/70">“${escHtml(entry.note)}”</span>` : '';
+      const b = canEdit ? `<button onclick="editNote('${routineId}')" class="${noteBtnCls}">${entry.note ? 'düzenle' : 'Not ekle'}</button>` : '';
+      return (n || b) ? `<div class="flex items-center gap-2 flex-wrap">${n}${b}</div>` : '';
+    }
+    window.editNote = async (routineId) => {
+      if (selectedDateKey < getTodayKey()) { showToast('Geçmiş gün kayıtları değiştirilemez', 'KİLİTLİ'); return; }
+      const entry = (logs[selectedDateKey] || {})[routineId]; if (!entry) return;
+      const r = routines.find(x => x.id === routineId);
+      const v = await uiDialog({ title: 'Not', text: `${r ? (r.groupName || r.name) : ''} için kısa bir not. En fazla ${NOTE_MAX} harf.`, ok: 'Kaydet', input: 'text', value: entry.note || '', placeholder: 'örn. yarım içti', maxlength: NOTE_MAX, allowEmpty: true });
+      if (v === null) return;
+      try {
+        await updateDoc(doc(db, 'families', familyCode, 'logs', selectedDateKey), { [`${routineId}.note`]: v ? v.slice(0, NOTE_MAX) : deleteField() });
+      } catch (e) { console.error(e); showToast('Not kaydedilemedi', 'HATA'); }
     };
 
     // --- KAYIT & EŞE BİLDİRİM ---
@@ -1315,14 +1336,29 @@
       if (routine && isTimeLocked(routine)) { showToast(`Bu doz ${routine.time.split('–')[0]} saatinde açılır`, 'HENÜZ DEĞİL'); renderRoutine(); return; }
       const nowTime = atTime || new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
       const payload = { status, by: currentProfile, time: nowTime };
+      // Taze kayıt: iki telefon aynı anda işaretlerse ikincisi birincinin kaydını fark etsin (çevrimdışıysa yerel kayıt kullanılır).
+      let fresh = (logs[selectedDateKey] || {})[routineId];
+      try { const snap = await getDoc(doc(db, 'families', familyCode, 'logs', selectedDateKey)); fresh = (snap.exists() ? snap.data() : {})[routineId]; } catch (e) { /* çevrimdışı */ }
+      if (!(routine && routine.asNeeded) && fresh) {
+        if (fresh.by === currentProfile && fresh.status === status) { renderRoutine(); return; } // çift dokunma
+        const st = fresh.status === 'skipped' ? (isSolo ? 'es geçilmiş' : 'es geçti') : (isSolo ? 'verilmiş' : 'verdi');
+        const txt = isSolo ? `Bu doz ${fresh.time} saatinde ${st}.` : `${nameOf(fresh.by)} bu dozu ${fresh.time} saatinde ${st}.`;
+        if (!(await uiDialog({ title: 'Bu doz zaten işaretli', text: `${txt} Yine de ${status === 'skipped' ? 'es geçildi' : 'verildi'} olarak işaretleyelim mi?`, ok: 'Yine de işaretle' }))) { renderRoutine(); return; }
+      }
       if (routine && routine.asNeeded) {
         payload.status = status = 'done';
         const last = lastPrnDose(routine.id);
+        let asked = false;
         if (routine.minHours && last && Date.now() - last.ts < routine.minHours * 3600000) {
+          asked = true;
           if (!(await uiDialog({ title: 'Henüz erken olabilir', text: `Son doz ${agoText(last.ts)} verildi; en az ${routine.minHours} saat ara önerilmişti.`, ok: 'Yine de ver' }))) return;
         }
-        const prev = (logs[selectedDateKey] || {})[routine.id];
+        const prev = fresh;
         const doses = prev ? (prev.doses ? prev.doses.slice() : [{ by: prev.by, time: prev.time }]) : [];
+        const lastD = doses[doses.length - 1];
+        if (!asked && !isSolo && lastD && lastD.by !== currentProfile && lastD.ts && Date.now() - lastD.ts < 15 * 60000) {
+          if (!(await uiDialog({ title: 'Az önce doz verilmiş', text: `${nameOf(lastD.by)} ${agoText(lastD.ts)} bir doz verdi (${lastD.time}). Yine de bir doz daha verelim mi?`, ok: 'Yine de ver' }))) { renderRoutine(); return; }
+        }
         doses.push({ by: currentProfile, time: nowTime, ts: Date.now() });
         payload.doses = doses;
       }
@@ -1472,10 +1508,14 @@
         det += `</tr>`;
       });
       det += `</tbody></table></div>`;
+      const noteRows = [];
+      keys.forEach(k => list.forEach(r => { const e = (logs[k] || {})[r.id]; if (e && e.note) noteRows.push(`<tr><td class="${td} whitespace-nowrap">${fmt(k, { day: 'numeric', month: 'short' })}</td><td class="${td}">${escHtml(r.name)}</td><td class="${td} text-center font-mono">${escHtml(e.time || '')}</td><td class="${td}">${escHtml(e.note)}</td></tr>`); }));
+      const notesSec = noteRows.length ? `<h2 class="text-xs font-bold uppercase tracking-wider mt-5">Notlar</h2><table class="w-full mt-3"><thead><tr><th class="${th} text-left">Tarih</th><th class="${th} text-left">İlaç</th><th class="${th}">Saat</th><th class="${th} text-left">Not</th></tr></thead><tbody>${noteRows.join('')}</tbody></table>` : '';
       return `<div><h1 class="text-lg font-bold tracking-tight">Dozaj özeti</h1>
         <p class="text-xs text-neutral-600 mt-0.5">${range} · son ${n} gün · <span id="report-name-print">${escHtml(document.getElementById('report-name') ? document.getElementById('report-name').value : '')}</span></p>
         <h2 class="text-xs font-bold uppercase tracking-wider mt-4">Genel</h2>${sum}
         <h2 class="text-xs font-bold uppercase tracking-wider mt-5">Gün gün</h2>${det}
+        ${notesSec}
         <p class="text-[10px] text-neutral-600 mt-2">Saat = işaretlendiği saat · es = es geçildi · ✗ = kayıt yok (verilmemiş ya da işaretlenmemiş olabilir) · … = bugün henüz işaretlenmemiş · · = o gün geçerli değil</p>
         <p class="text-[10px] text-neutral-500 mt-3">Bu özet, uygulamadaki işaretlemelerden otomatik üretilmiştir; tıbbi değerlendirme yerine geçmez.</p></div>`;
     }
@@ -1966,7 +2006,7 @@
         const undo = (!isPast && !editMode && e.by === currentProfile) ? `<button onclick="undoAction('${m.id}')" class="text-[11px] font-medium text-muted hover:text-ink underline underline-offset-2">Geri al</button>` : '';
         const who = skipped ? (isSolo ? 'es geçildi' : `${escHtml(nameOf(e.by))} es geçti`) : (isSolo ? 'verildi' : `${escHtml(nameOf(e.by))} verdi`);
         const mark = skipped ? '<span class="text-muted">–</span>' : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>';
-        return `<div class="flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold ${skipped ? 'text-muted' : 'text-forest'}">${mark}<span class="font-mono">${m.time}</span> ${who}</span><span class="flex items-center gap-3"><span class="font-mono text-muted">${e.time}</span>${undo}</span></div>`;
+        return `<div><div class="flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold ${skipped ? 'text-muted' : 'text-forest'}">${mark}<span class="font-mono">${m.time}</span> ${who}</span><span class="flex items-center gap-3"><span class="font-mono text-muted">${e.time}</span>${undo}</span></div>${(!isPast && !editMode) || e.note ? `<div class="mt-1 ml-5">${noteHtml(m.id, e, !isPast && !editMode)}</div>` : ''}</div>`;
       };
       const renderGroupCard = (unit) => {
         const mem = unit.slice().sort((a, b) => startMinutes(a.time) - startMinutes(b.time));
@@ -2040,11 +2080,13 @@
             ? `<span class="font-semibold text-forest">${doses.length} kez verildi</span> <span class="font-mono">${doses.map(d => d.time).join(', ')}</span>`
             : (last ? `Son doz: ${agoText(last.ts)}${r.minHours ? ` · en az ${r.minHours} sa ara` : ''}` : (r.minHours ? `En az ${r.minHours} sa arayla` : 'Henüz verilmedi'));
           const btn = (!isPast && !editMode) ? `<button onclick="recordAction('${r.id}', 'done')" class="mt-2.5 w-full h-9 rounded-md bg-ink text-white text-xs font-semibold hover:bg-neutral-800 active:scale-[0.99] transition">${doses.length ? 'Bir doz daha' : 'Verdim'}</button>` : '';
-          actionHtml = `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs text-muted">${info}${doses.length && !isSolo ? ` <span>(${escHtml(nameOf(entry.by))})</span>` : ''}${btn}</div>`;
+          const prnNote = entry && (!isPast && !editMode || entry.note) ? `<div class="mt-1.5">${noteHtml(r.id, entry, !isPast && !editMode)}</div>` : '';
+          actionHtml = `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs text-muted">${info}${doses.length && !isSolo ? ` <span>(${escHtml(nameOf(entry.by))})</span>` : ''}${prnNote}${btn}</div>`;
         } else if (entry) {
           actionHtml = isDone
             ? `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold text-forest"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>${isSolo ? 'Verildi' : `${escHtml(nameOf(entry.by))} tarafından verildi`}</span><span class="font-mono text-muted font-medium">${entry.time}</span></div>`
             : `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs text-muted"><span>${isSolo ? 'Es geçildi' : `${escHtml(nameOf(entry.by))} tarafından es geçildi`}</span><span class="font-mono">${entry.time}</span></div>`;
+          if (!isPast && !editMode || entry.note) actionHtml += `<div class="mt-1.5">${noteHtml(r.id, entry, !isPast && !editMode)}</div>`;
         } else if (isPast) {
           actionHtml = `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs font-semibold text-signal">Verilmedi</div>`;
         } else if (!editMode) {
@@ -2140,7 +2182,7 @@
         let rows = entries.length === 0 ? `<p class="text-xs text-muted italic mt-1">Kayıt girilmemiş.</p>` : `<div class="mt-2 space-y-1.5">` + entries.map(({ routine, log, auto }) => `
           <div class="flex items-center justify-between text-xs"><span class="font-medium text-ink">${routine.name}</span>${auto
             ? `<span class="font-mono text-[11px] text-signal">Verilmedi</span>`
-            : `<span class="font-mono text-[11px] ${log.status === 'done' ? 'text-forest' : 'text-muted'}">${log.status === 'done' ? (routine.asNeeded && log.doses && log.doses.length > 1 ? `${log.doses.length} kez · ${log.time}` : (isSolo ? log.time : `${escHtml(nameOf(log.by))} · ${log.time}`)) : (isSolo ? 'Es geçildi' : `Es geçildi (${escHtml(nameOf(log.by))})`)}</span>`}</div>`).join('') + `</div>`;
+            : `<span class="font-mono text-[11px] ${log.status === 'done' ? 'text-forest' : 'text-muted'}">${log.status === 'done' ? (routine.asNeeded && log.doses && log.doses.length > 1 ? `${log.doses.length} kez · ${log.time}` : (isSolo ? log.time : `${escHtml(nameOf(log.by))} · ${log.time}`)) : (isSolo ? 'Es geçildi' : `Es geçildi (${escHtml(nameOf(log.by))})`)}</span>`}</div>${log && log.note ? `<div class="text-[11px] italic text-ink/70 -mt-0.5">“${escHtml(log.note)}”</div>` : ''}`).join('') + `</div>`;
         card.innerHTML = `<div class="flex items-center justify-between border-b border-line/60 pb-2"><span class="text-xs font-bold text-ink">${d.fullLabel}</span><button onclick="jumpToDate('${d.key}')" class="font-mono text-[11px] text-muted hover:text-ink underline underline-offset-2">Güne git →</button></div>${rows}`;
         feedEl.appendChild(card);
       });
