@@ -77,7 +77,18 @@
   <div id="loading-overlay" class="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-paper/70 backdrop-blur-md" role="status" aria-live="polite">
     <svg class="animate-spin h-8 w-8 text-ink" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".2" stroke-width="3"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
     <p id="loading-text" class="text-sm font-semibold text-ink">Bağlanıyor...</p>
+    <div id="loading-slow" class="hidden flex-col items-center gap-3 px-8 text-center">
+      <p id="loading-slow-text" class="text-sm text-ink/60">Bağlantı beklenenden uzun sürüyor. İnternetinizi kontrol edin; bağlanınca kendiliğinden devam eder.</p>
+      <button type="button" onclick="location.reload()" class="px-4 py-2 bg-ink text-white rounded-lg text-sm font-semibold">Tekrar dene</button>
+    </div>
   </div>
+  <script>
+    // Firebase dosyaları hiç yüklenmese bile (engelli ağ / internet yok) 10 sn sonra açıklama göster
+    window.slowTimer = setTimeout(function () {
+      var o = document.getElementById('loading-overlay'), b = document.getElementById('loading-slow');
+      if (o && !o.classList.contains('hidden')) { b.classList.remove('hidden'); b.classList.add('flex'); }
+    }, 10000);
+  </script>
 
   <!-- Şurup dolum katmanı (kritik doz basılı tutulurken ekranın altından yükselir) -->
   <canvas id="syrup-canvas" class="hidden fixed inset-0 w-full h-full z-40 pointer-events-none" aria-hidden="true"></canvas>
@@ -875,7 +886,13 @@
       wrap.querySelector('#nm-a').focus();
     });
     function showLoading(t) { document.getElementById('loading-text').textContent = t || 'Bağlanıyor...'; document.getElementById('loading-overlay').classList.remove('hidden'); }
-    function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
+    function hideLoading() { clearTimeout(window.slowTimer); document.getElementById('loading-slow').classList.add('hidden'); document.getElementById('loading-slow').classList.remove('flex'); document.getElementById('loading-overlay').classList.add('hidden'); }
+    // Bağlantı 10 sn içinde kurulamazsa kullanıcıya durumu ve "Tekrar dene" düğmesini göster
+    function showSlow(text) {
+      const b = document.getElementById('loading-slow');
+      if (text) document.getElementById('loading-slow-text').textContent = text;
+      if (!document.getElementById('loading-overlay').classList.contains('hidden')) { b.classList.remove('hidden'); b.classList.add('flex'); }
+    }
 
     // --- GOOGLE İLE GİRİŞ ---
     window.googleSignIn = async (where) => {
@@ -2128,7 +2145,11 @@
     };
 
     window.switchTab('routine');
-    boot().catch((e) => console.error(e)).finally(hideLoading);
+    boot().then(hideLoading, (e) => {
+      console.error(e);
+      // Açılış başarısız oldu (ör. internet yok): boş ekran yerine açıklama ve "Tekrar dene" göster
+      showSlow('Bağlanılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.');
+    });
   </script>
 </body>
 </html>
