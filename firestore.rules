@@ -40,7 +40,7 @@ service cloud.firestore {
         && request.resource.data.members[request.auth.uid] == true;
 
       allow update: if request.auth != null
-        && request.resource.data.keys().hasOnly(['createdAt', 'mode', 'names', 'routines', 'tokens', 'sessions', 'members', 'joinInvite'])
+        && request.resource.data.keys().hasOnly(['createdAt', 'mode', 'names', 'routines', 'tokens', 'sessions', 'members', 'joinInvite', 'viewToken'])
         && (!('routines' in request.resource.data) || request.resource.data.routines.size() <= 200)
         && (!('names' in request.resource.data) || (
               request.resource.data.names.keys().hasOnly(['Anne', 'Baba'])
@@ -91,6 +91,30 @@ service cloud.firestore {
       allow delete: if request.auth != null
         && (resource.data.createdBy == request.auth.uid
             || request.auth.uid in getAfter(famPath(resource.data.familyId)).data.members);
+    }
+
+    // Görüntüleme bağlantısı: aile dışı biri için yalnızca okunur, arınmış kopya (ilaç adları ve son günlerin kayıtları).
+    // Anahtarı (32 hane) bilen ve süresi dolmamış belgeyi okuyabilir; yalnızca ailenin üyeleri oluşturur, günceller, siler.
+    match /shares/{tok} {
+      allow get: if request.auth != null
+        && tok.matches('^[0-9a-f]{32}$')
+        && resource.data.exp > request.time.toMillis();
+      allow list: if false;
+      allow create: if request.auth != null
+        && tok.matches('^[0-9a-f]{32}$')
+        && request.resource.data.keys().hasOnly(['familyId', 'createdBy', 'exp', 'updatedAt', 'data'])
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.exp is number
+        && request.resource.data.exp <= request.time.toMillis() + 2678400000
+        && request.resource.data.data.routines.size() <= 200
+        && isMember(request.resource.data.familyId);
+      allow update: if request.auth != null
+        && request.resource.data.keys().hasOnly(['familyId', 'createdBy', 'exp', 'updatedAt', 'data'])
+        && request.resource.data.familyId == resource.data.familyId
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.exp == resource.data.exp
+        && isMember(resource.data.familyId);
+      allow delete: if request.auth != null && isMember(resource.data.familyId);
     }
 
     // Geri kalan her şey kapalı.

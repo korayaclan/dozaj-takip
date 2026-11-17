@@ -123,6 +123,8 @@
   </div>
 
   <!-- EKRAN 0: EŞLEŞME (AİLE KODU) EKRANI -->
+  <div id="screen-viewer" class="hidden max-w-lg mx-auto px-4 pt-5 pb-10" aria-live="polite"></div>
+
   <div id="screen-onboarding" class="hidden max-w-md mx-auto px-4 pt-6 pb-4 sm:pt-12">
     <p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">BAŞLANGIÇ</p>
     <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-ink mt-0.5">Dozaj Takip</h1>
@@ -322,6 +324,7 @@
       </div>
       <div class="mt-3 text-xs text-muted flex flex-wrap gap-x-5 gap-y-1">
         <button onclick="exportRecords()" class="hover:text-ink underline underline-offset-4 transition">Kayıtları indir (CSV)</button>
+        <button onclick="openShare()" class="hover:text-ink underline underline-offset-4 transition">Görüntüleme bağlantısı</button>
         <button onclick="editNames()" id="btn-edit-names" class="hidden hover:text-ink underline underline-offset-4 transition">Adları düzenle</button>
         <a href="gizlilik.html" class="hover:text-ink underline underline-offset-4 transition">Gizlilik</a>
       </div>
@@ -951,6 +954,8 @@
       try { history.scrollRestoration = 'manual'; } catch (e) {}
       if (auth.authStateReady) await auth.authStateReady();
       if (!auth.currentUser) await signInAnonymously(auth);
+      const vt = viewerToken();
+      if (vt) { startViewer(vt); return; } // görüntüleme bağlantısı: aile uygulaması hiç başlamaz
       try { await handleEmailLink(); } catch (e) { console.error(e); }
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./firebase-messaging-sw.js').catch(console.error);
@@ -1207,6 +1212,7 @@
           const soloNow = snap.data().mode === 'solo';
           if (soloNow !== isSolo) { isSolo = soloNow; if (soloNow) localStorage.setItem('dozaj_mode', 'solo'); else localStorage.removeItem('dozaj_mode'); applySoloUI(); }
           routines = sortRoutines(snap.data().routines || DEFAULT_ROUTINES);
+          viewToken = snap.data().viewToken || null; scheduleShareSync();
           if (activeTab === 'routine') renderRoutine();
           else renderHistory();
         }
@@ -1216,7 +1222,7 @@
       unsubLogs = onSnapshot(collection(db, 'families', familyCode, 'logs'), (snap) => {
         const nextLogs = {};
         snap.forEach(d => { nextLogs[d.id] = d.data(); });
-        logs = nextLogs;
+        logs = nextLogs; scheduleShareSync();
         if (activeTab === 'routine') renderRoutine();
         else renderHistory();
       }, (err) => { console.error(err); if (err && err.code === 'permission-denied') lockedOut(); });
@@ -1401,6 +1407,149 @@
           showToast('Eşinize bildirim gönderilemedi (bağlantı)', 'HATA');
         });
     };
+
+    // --- GÖRÜNTÜLEME BAĞLANTISI ---
+    // Bakıcı gibi aile dışı biri için yalnızca okunur bağlantı. Aile belgesi açılmaz: üyeler, ilaç adları ve bugünle dünün kayıtlarından oluşan
+    // arınmış bir kopya `shares/{anahtar}` altında tutulur (jeton, bildirim anahtarı vb. yok). Anahtarı bilen okur, yalnızca üyeler yazar.
+    let viewToken = null, shareHash = '', shareTimer = null;
+    const newToken = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+    const dayKeyAgo = (i) => { const d = new Date(); d.setDate(d.getDate() - i); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    function shareData() {
+      const slim = routines.map(r => {
+        const o = { id: r.id, name: r.name, time: r.time, priority: r.priority || 'standard' };
+        if (r.groupName) o.groupName = r.groupName;
+        if (r.asNeeded) o.asNeeded = true;
+        if (r.note && r.note !== 'Esnek pencere') o.note = r.note;
+        ['startedOn', 'courseDays', 'endedOn'].forEach(k => { if (r[k] != null) o[k] = r[k]; });
+        return o;
+      });
+      const ids = new Set(slim.map(r => r.id)); const sl = {};
+      [0, 1].forEach(i => {
+        const k = dayKeyAgo(i); const day = logs[k] || {}; const out = {};
+        Object.keys(day).forEach(id => {
+          if (!ids.has(id)) return; const e = day[id]; const o = { status: e.status, by: e.by, time: e.time };
+          if (e.note) o.note = e.note;
+          if (e.doses) o.doses = e.doses.map(d => ({ by: d.by, time: d.time }));
+          out[id] = o;
+        });
+        sl[k] = out;
+      });
+      return { names: { Anne: nameOf('Anne'), Baba: nameOf('Baba') }, solo: !!isSolo, routines: slim, logs: sl };
+    }
+    function scheduleShareSync() {
+      if (!viewToken) return;
+      clearTimeout(shareTimer);
+      shareTimer = setTimeout(async () => {
+        try {
+          const data = shareData(); const h = JSON.stringify(data); if (h === shareHash) return;
+          await updateDoc(doc(db, 'shares', viewToken), { data, updatedAt: Date.now() }); shareHash = h;
+        } catch (e) { console.error(e); }
+      }, 1500);
+    }
+    const shareUrl = (t) => `${location.origin}${location.pathname}#g=${t}`;
+    const whenText = (ts) => {
+      const d = new Date(ts); const hm = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+      const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return k === dayKeyAgo(0) ? `bugün ${hm}` : (k === dayKeyAgo(1) ? `dün ${hm}` : `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} ${hm}`);
+    };
+    window.closeShareModal = () => { const w = document.getElementById('share-modal'); if (w) w.remove(); };
+    window.openShare = async () => {
+      if (document.getElementById('share-modal')) return;
+      let info = null;
+      if (viewToken) { try { const sn = await getDoc(doc(db, 'shares', viewToken)); info = sn.exists() ? sn.data() : null; } catch (e) { info = null; } }
+      const w = document.createElement('div'); w.id = 'share-modal';
+      w.className = 'fixed inset-0 z-[110] flex items-center justify-center p-5 bg-ink/40 backdrop-blur-sm';
+      w.onclick = (e) => { if (e.target === w) closeShareModal(); };
+      const box = (inner) => `<div role="dialog" aria-modal="true" class="w-full max-w-sm bg-surface border border-line rounded-2xl shadow-xl p-5">${inner}</div>`;
+      const btn = 'h-11 rounded-md text-sm font-semibold transition';
+      if (viewToken && info) {
+        const url = shareUrl(viewToken);
+        w.innerHTML = box(`<h3 class="text-base font-bold text-ink">Görüntüleme bağlantısı</h3>
+          <p class="text-sm text-muted mt-2 leading-relaxed">Bağlantıya sahip olan, bugünkü ve dünkü dozları <b>yalnızca görebilir</b>; hiçbir şeyi değiştiremez. ${escHtml(whenText(info.exp))} saatine kadar geçerli.</p>
+          <input id="share-url" readonly value="${escHtml(url)}" onfocus="this.select()" class="mt-3 w-full px-3 py-2.5 text-xs font-mono bg-paper border border-line rounded-md" />
+          <div class="mt-3 flex gap-2"><button type="button" onclick="copyShare()" class="flex-1 ${btn} bg-ink text-white">Kopyala</button>${navigator.share ? `<button type="button" onclick="sendShare()" class="flex-1 ${btn} border border-line bg-paper text-ink">Paylaş</button>` : ''}</div>
+          <p class="text-[11px] text-muted mt-3 leading-snug">Bağlantıyı yalnızca güvendiğiniz kişiyle paylaşın. İsterseniz aşağıdan hemen kapatabilirsiniz.</p>
+          <div class="mt-4 flex gap-2"><button type="button" onclick="closeShareLink()" class="flex-1 ${btn} bg-red-600 text-white">Bağlantıyı kapat</button><button type="button" onclick="closeShareModal()" class="flex-1 ${btn} border border-line bg-paper text-ink">Tamam</button></div>`);
+      } else if (viewToken) { // süresi dolmuş ya da silinmiş
+        w.innerHTML = box(`<h3 class="text-base font-bold text-ink">Bağlantının süresi dolmuş</h3><p class="text-sm text-muted mt-2">Yeni bir bağlantı oluşturmak için eskisini temizleyelim.</p>
+          <div class="mt-4 flex gap-2"><button type="button" onclick="closeShareLink(true)" class="flex-1 ${btn} bg-ink text-white">Temizle ve yeni oluştur</button><button type="button" onclick="closeShareModal()" class="flex-1 ${btn} border border-line bg-paper text-ink">Vazgeç</button></div>`);
+      } else {
+        w.innerHTML = box(`<h3 class="text-base font-bold text-ink">Görüntüleme bağlantısı</h3>
+          <p class="text-sm text-muted mt-2 leading-relaxed">Bakıcı ya da aileden biri bu bağlantıyla bugünkü ve dünkü dozları <b>yalnızca görebilir</b>. Giriş gerekmez, hiçbir şeyi değiştiremez. Süre dolunca ya da siz kapatınca çalışmaz.</p>
+          <p class="text-xs font-semibold text-ink mt-4">Ne kadar süre geçerli olsun?</p>
+          <div id="share-days" class="mt-2 grid grid-cols-3 gap-2">${[[1, '1 gün'], [7, '7 gün'], [30, '30 gün']].map(([d, t]) => `<button type="button" data-d="${d}" onclick="pickShareDays(${d})" class="${btn} border border-line">${t}</button>`).join('')}</div>
+          <div class="mt-5 flex gap-2"><button type="button" onclick="makeShareLink()" class="flex-1 ${btn} bg-ink text-white">Bağlantı oluştur</button><button type="button" onclick="closeShareModal()" class="flex-1 ${btn} border border-line bg-paper text-ink">Vazgeç</button></div>`);
+      }
+      document.body.appendChild(w); if (!viewToken) pickShareDays(7);
+    };
+    let shareDays = 7;
+    window.pickShareDays = (d) => { shareDays = d; document.querySelectorAll('#share-days button').forEach(b => { const on = Number(b.dataset.d) === d; b.classList.toggle('bg-ink', on); b.classList.toggle('text-white', on); }); };
+    window.makeShareLink = async () => {
+      closeShareModal(); showLoading('Bağlantı hazırlanıyor...');
+      try {
+        const token = newToken(); const data = shareData();
+        await setDoc(doc(db, 'shares', token), { familyId: familyCode, createdBy: auth.currentUser.uid, exp: Date.now() + shareDays * 86400000, updatedAt: Date.now(), data });
+        shareHash = JSON.stringify(data);
+        await updateDoc(doc(db, 'families', familyCode), { viewToken: token });
+        viewToken = token; hideLoading(); openShare();
+      } catch (e) { console.error(e); hideLoading(); showToast('Bağlantı oluşturulamadı', 'HATA'); }
+    };
+    window.closeShareLink = async (reopen) => {
+      closeShareModal();
+      try {
+        const b = writeBatch(db);
+        b.delete(doc(db, 'shares', viewToken));
+        b.update(doc(db, 'families', familyCode), { viewToken: deleteField() });
+        await b.commit(); viewToken = null; shareHash = '';
+        showToast('Bağlantı kapatıldı', 'TAMAM'); if (reopen) openShare();
+      } catch (e) { console.error(e); showToast('Bağlantı kapatılamadı', 'HATA'); }
+    };
+    window.copyShare = async () => { try { await navigator.clipboard.writeText(shareUrl(viewToken)); showToast('Bağlantı kopyalandı', 'KOPYALANDI'); } catch (e) { const i = document.getElementById('share-url'); if (i) { i.select(); } } };
+    window.sendShare = async () => { try { await navigator.share({ title: 'Dozaj', text: 'Bugünkü dozları buradan görebilirsin', url: shareUrl(viewToken) }); } catch (e) { /* iptal */ } };
+
+    // Görüntüleyici (bağlantıyı açan kişi)
+    const viewerToken = () => { const m = /^#g=([0-9a-f]{32})$/.exec(location.hash); return m ? m[1] : null; };
+    function viewerDay(d, key, label) {
+      const dayLogs = (d.logs || {})[key] || {}; const today = key === dayKeyAgo(0);
+      const n = new Date(); const nowMin = n.getHours() * 60 + n.getMinutes();
+      const who = (p) => escHtml((d.names || {})[p] || p);
+      const madeKey = (r) => { const m = /^r_(\d{12,})/.exec(r.id); if (!m) return null; const x = new Date(Number(m[1])); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
+      const rs = (d.routines || []).filter(r => isActiveOn(r, key) && (!madeKey(r) || key >= madeKey(r))).sort((a, b) => startMinutes(a.time) - startMinutes(b.time));
+      if (!rs.length) return '';
+      const rows = rs.map(r => {
+        const e = dayLogs[r.id]; let st, cls = 'text-muted';
+        if (r.asNeeded) {
+          const doses = e ? (e.doses && e.doses.length ? e.doses : [{ by: e.by, time: e.time }]) : [];
+          st = doses.length ? `${doses.length} kez · ${doses.map(x => escHtml(x.time)).join(', ')}` : 'Verilmedi'; if (doses.length) cls = 'text-forest font-semibold';
+        } else if (e && e.status === 'done') { st = `✓ ${d.solo ? 'Verildi' : who(e.by) + ' verdi'} · ${escHtml(e.time)}`; cls = 'text-forest font-semibold'; }
+        else if (e) st = 'Es geçildi';
+        else if (!today) st = 'Kayıt yok';
+        else { const due = dueMinutes(r.time); st = (due != null && nowMin >= due + 60) ? 'İşaretlenmemiş' : 'Bekliyor'; if (st === 'İşaretlenmemiş') cls = 'text-signal'; }
+        const sub = [r.note, e && e.note ? `“${escHtml(e.note)}”` : ''].filter(Boolean).join(' · ');
+        return `<div class="py-2.5 flex items-start justify-between gap-3"><div class="min-w-0"><div class="text-sm font-semibold text-ink">${escHtml(r.name)}</div>${sub ? `<div class="text-[11px] text-muted italic mt-0.5">${sub}</div>` : ''}</div><div class="text-right shrink-0"><div class="font-mono text-[11px] text-muted">${r.asNeeded ? 'gerekirse' : escHtml(r.time)}</div><div class="text-xs ${cls} mt-0.5">${st}</div></div></div>`;
+      }).join('');
+      return `<h2 class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted mt-6 mb-1">${label}</h2><div class="bg-surface border border-line rounded-lg px-4 divide-y divide-line/70">${rows}</div>`;
+    }
+    function renderViewer(el, d, state) {
+      const head = `<div class="flex items-center justify-between"><span class="px-2.5 py-1 bg-ink text-white text-xs font-semibold rounded">Dozaj</span><span class="text-[11px] font-semibold text-muted border border-line rounded px-2 py-1">Yalnızca görüntüleme</span></div>`;
+      if (state !== 'ok' || !d || (d.exp && d.exp < Date.now())) {
+        el.innerHTML = `${head}<div class="mt-8 p-5 bg-surface border border-line rounded-lg"><h1 class="text-base font-bold text-ink">Bu bağlantı geçerli değil</h1><p class="text-sm text-muted mt-2 leading-relaxed">Süresi dolmuş ya da kapatılmış olabilir. Yeni bir bağlantı için aileden birine ulaşın.</p></div>`; return;
+      }
+      const dateLine = parseDateKey(dayKeyAgo(0)).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' });
+      el.innerHTML = `${head}<p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted mt-6">BUGÜN</p><h1 class="text-xl font-bold tracking-tight text-ink mt-0.5">${dateLine}</h1>
+        <p class="text-xs text-muted mt-1">Son güncelleme: ${escHtml(whenText(d.updatedAt || Date.now()))}</p>
+        ${viewerDay(d, dayKeyAgo(0), 'Bugün') || '<p class="text-sm text-muted mt-4">Bugün için kayıtlı doz yok.</p>'}
+        ${viewerDay(d, dayKeyAgo(1), 'Dün')}
+        <p class="text-[11px] text-muted mt-6 leading-relaxed">Bu sayfa yalnızca görüntüleme içindir. Bağlantı ${escHtml(whenText(d.exp))} saatine kadar geçerlidir.</p>`;
+    }
+    function startViewer(token) {
+      document.getElementById('screen-onboarding').classList.add('hidden'); document.getElementById('screen-app').classList.add('hidden');
+      const el = document.getElementById('screen-viewer'); el.classList.remove('hidden');
+      let data = null, state = 'wait';
+      const draw = () => { if (state !== 'wait') renderViewer(el, data, state); };
+      onSnapshot(doc(db, 'shares', token), (snap) => { if (snap.exists()) { const v = snap.data(); data = { ...(v.data || {}), exp: v.exp, updatedAt: v.updatedAt }; state = 'ok'; } else state = 'gone'; draw(); }, (err) => { console.error(err); state = 'denied'; draw(); });
+      setInterval(draw, 60000);
+    }
 
     // --- AİLE SERİSİ VE ROZETLER ---
     // Gün "tamam": o gün geçerli tüm planlı dozların kaydı var (verildi ya da es geçildi). Kaydı olmayan geçmiş gün seriyi keser.
