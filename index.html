@@ -271,6 +271,8 @@
         </div>
       </div>
 
+      <div id="late-strip"></div>
+
       <div id="routine-list" class="space-y-3"></div>
 
       <div class="mt-8 pt-4 border-t border-line flex items-center justify-between text-xs text-muted">
@@ -1284,7 +1286,7 @@
     };
 
     // --- KAYIT & EŞE BİLDİRİM ---
-    window.recordAction = async (routineId, status) => {
+    window.recordAction = async (routineId, status, atTime) => {
       if (selectedDateKey < getTodayKey()) {
         showToast('Geçmiş güne kayıt girilemez', 'KİLİTLİ');
         renderRoutine();
@@ -1292,7 +1294,7 @@
       }
       const routine = routines.find(r => r.id === routineId);
       if (routine && isTimeLocked(routine)) { showToast(`Bu doz ${routine.time.split('–')[0]} saatinde açılır`, 'HENÜZ DEĞİL'); renderRoutine(); return; }
-      const nowTime = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+      const nowTime = atTime || new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
       const payload = { status, by: currentProfile, time: nowTime };
       if (routine && routine.asNeeded) {
         payload.status = status = 'done';
@@ -1344,6 +1346,55 @@
           showToast('Eşinize bildirim gönderilemedi (bağlantı)', 'HATA');
         });
     };
+
+    // --- İŞARETLENMEMİŞ DOZ ŞERİDİ ---
+    // Planlanan saatin (aralıksa pencere sonunun) üstünden 1 saat geçtiyse ve kayıt yoksa, bugün için
+    // yumuşak bir hatırlatma: doz verilmiş de olabilir, sadece işaretlenmemiştir. Kapat'a basılan doz bu cihazda gizlenir.
+    const LATE_MIN = 60;
+    let lateAskId = null;
+    const lateKey = (id) => `dozaj_late_${getTodayKey()}_${id}`;
+    const lateHidden = (id) => { try { return localStorage.getItem(lateKey(id)) === '1'; } catch (e) { return false; } };
+    function dueMinutes(time) {
+      const all = [...String(time || '').matchAll(/(\d{1,2}):(\d{2})/g)];
+      if (!all.length) return null;
+      const m = all[isRange(time) && all.length > 1 ? 1 : 0];
+      return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    }
+    function findLate() {
+      if (activeTab !== 'routine' || editMode || selectedDateKey !== getTodayKey()) return null;
+      const n = new Date(); const nowMin = n.getHours() * 60 + n.getMinutes();
+      const dayLogs = logs[selectedDateKey] || {};
+      const startOfDay = new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime();
+      let best = null;
+      for (const r of routines) {
+        if (r.asNeeded || dayLogs[r.id] || !isActiveOn(r, selectedDateKey) || lateHidden(r.id)) continue;
+        const due = dueMinutes(r.time); if (due == null || nowMin < due + LATE_MIN) continue;
+        const made = /^r_(\d{12,})/.exec(r.id); // bugün, saati geçtikten sonra eklenen rutin için uyarma
+        if (made && Number(made[1]) > startOfDay + due * 60000) continue;
+        if (!best || due < best.due) best = { r, due };
+      }
+      return best ? best.r : null;
+    }
+    function renderLateStrip() {
+      const el = document.getElementById('late-strip'); if (!el) return;
+      const r = findLate();
+      if (!r) { el.innerHTML = ''; lateAskId = null; return; }
+      const planned = r.time.split(/[–-]/)[0].trim();
+      const label = escHtml(r.groupName ? `${r.groupName} (${planned})` : `${r.name} (${planned})`);
+      const btn = 'h-9 px-3 rounded-md text-xs font-semibold transition active:scale-[0.99]';
+      const ask = lateAskId === r.id;
+      el.innerHTML = `<div class="mb-4 p-3.5 rounded-lg border border-line bg-surface shadow-sm" role="status">
+        <p class="text-sm font-semibold text-ink">${label} işaretlenmemiş</p>
+        <p class="text-xs text-muted mt-0.5">${ask ? 'Ne zaman verildi?' : 'Verilmiş olabilir; sadece kaydı yoksa işaretleyin.'}</p>
+        <div class="mt-2.5 flex flex-wrap gap-2">${ask
+          ? `<button onclick="lateGive('${r.id}','now')" class="${btn} bg-ink text-white">Şimdi verdim</button><button onclick="lateGive('${r.id}','planned')" class="${btn} bg-ink text-white">${escHtml(planned)} civarı verildi</button><button onclick="lateAsk(null)" class="${btn} border border-line bg-paper text-muted">Vazgeç</button>`
+          : `<button onclick="lateAsk('${r.id}')" class="${btn} bg-ink text-white">Verildi</button>${r.priority === 'critical' ? '' : `<button onclick="lateSkip('${r.id}')" class="${btn} border border-line bg-paper text-ink">Bugün yok</button>`}<button onclick="lateHide('${r.id}')" class="${btn} border border-line bg-paper text-muted">Kapat</button>`}</div></div>`;
+    }
+    window.lateAsk = (id) => { lateAskId = id; renderLateStrip(); };
+    window.lateGive = async (id, when) => { lateAskId = null; const r = routines.find(x => x.id === id); await recordAction(id, 'done', when === 'planned' && r ? r.time.split(/[–-]/)[0].trim() : undefined); renderLateStrip(); };
+    window.lateSkip = async (id) => { lateAskId = null; await recordAction(id, 'skipped'); renderLateStrip(); };
+    window.lateHide = (id) => { try { localStorage.setItem(lateKey(id), '1'); } catch (e) { /* gizleme bu oturumla sınırlı kalır */ } lateAskId = null; renderLateStrip(); };
+    setInterval(renderLateStrip, 60000);
 
     window.undoAction = async (routineId) => {
       if (selectedDateKey < getTodayKey()) {
@@ -1878,6 +1929,7 @@
       const countable = visible.filter(r => !r.asNeeded).length;
       document.getElementById('progress-label').textContent = `${completedCount}/${countable}`;
       document.getElementById('progress-fill').style.width = countable > 0 ? `${(completedCount / countable) * 100}%` : '0%';
+      renderLateStrip();
     }
 
     function renderHistory() {
