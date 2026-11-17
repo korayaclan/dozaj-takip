@@ -215,7 +215,7 @@
   <div id="screen-app" class="hidden max-w-lg mx-auto px-4 pt-5">
     
     <!-- Üst Bar -->
-    <header class="flex flex-nowrap items-center justify-between gap-1.5 pb-4 border-b border-line">
+    <header class="flex flex-nowrap items-center justify-between gap-3 pb-4 border-b border-line">
       <div class="flex items-center gap-1.5 min-w-0">
         <span id="badge-profile" onclick="openStreak()" role="button" tabindex="0" class="px-2.5 py-1 bg-ink text-white text-xs font-semibold rounded cursor-pointer inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"><span id="badge-name"></span><span id="streak-chip" class="hidden items-center gap-0.5 pl-1.5 border-l border-white/30 text-[11px] text-amber-300" title="Aile serisi"></span></span>
         <button onclick="showInvite()" class="px-2 py-1 whitespace-nowrap bg-line/60 hover:bg-line text-ink text-[11px] font-medium rounded transition flex items-center gap-1" title="Aileden birini davet et">
@@ -230,9 +230,9 @@
           <button onclick="switchTab('history')" id="tab-history" class="px-2.5 py-1 text-xs font-semibold rounded transition-all">Geçmiş</button>
         </div>
 
-        <button onclick="openAddModal()" class="px-2 py-1.5 bg-ink text-white text-xs font-semibold rounded-md hover:bg-neutral-800 active:scale-95 transition flex items-center gap-1">
+        <button onclick="openAddModal()" title="Ekle" class="px-2.5 py-1.5 bg-ink text-white text-xs font-semibold rounded-md hover:bg-neutral-800 active:scale-95 transition flex items-center gap-1">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-          Ekle
+          <span class="sr-only">Ekle</span>
         </button>
       </div>
     </header>
