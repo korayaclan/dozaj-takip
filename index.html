@@ -43,6 +43,18 @@
     input, textarea { -webkit-user-select: text; user-select: text; }
     img, a { -webkit-user-drag: none; }
     .no-select { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    /* Doktora özeti: ekranda tam sayfa katman, yazdırırken yalnızca özet */
+    #report-overlay table { border-collapse: collapse; }
+    @media print {
+      @page { margin: 12mm; }
+      body { background: #fff !important; }
+      body > *:not(#report-overlay) { display: none !important; }
+      #report-overlay { position: static !important; display: block !important; overflow: visible !important; background: #fff !important; }
+      #report-overlay .no-print { display: none !important; }
+      #report-overlay .rep-scroll { overflow: visible !important; }
+      #report-overlay table { page-break-inside: auto; }
+      #report-overlay tr { page-break-inside: avoid; }
+    }
     @keyframes bubble-rise {
       0% { transform: translateY(0) scale(0.5); opacity: 0; }
       20% { opacity: 0.85; }
@@ -314,9 +326,12 @@
 
     <!-- SEKME 2: GEÇMİŞ TAKİP -->
     <section id="view-history" class="pt-5 hidden">
-      <div class="mb-5">
-        <p id="history-month" class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">KAYIT DEFTERİ</p>
-        <h1 class="text-xl font-bold tracking-tight text-ink mt-0.5">Son 14 Gün</h1>
+      <div class="mb-5 flex items-end justify-between gap-3">
+        <div>
+          <p id="history-month" class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">KAYIT DEFTERİ</p>
+          <h1 class="text-xl font-bold tracking-tight text-ink mt-0.5">Son 14 Gün</h1>
+        </div>
+        <button onclick="openReport()" class="shrink-0 h-8 px-3 rounded-md border border-line bg-surface text-xs font-semibold text-ink hover:bg-neutral-100 active:scale-95 transition">Doktora özet</button>
       </div>
       <div id="history-matrix" class="bg-surface border border-line rounded-lg py-4 pr-4 mb-6 overflow-x-auto no-scrollbar"></div>
       <h2 class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted mb-3">GÜNLÜK DETAYLAR</h2>
@@ -1347,6 +1362,63 @@
         });
     };
 
+    // --- DOKTORA ÖZET ---
+    let reportDays = 7;
+    function reportData(n) {
+      const todayKey = getTodayKey(); const base = new Date(); const keys = [];
+      for (let i = n - 1; i >= 0; i--) { const d = new Date(base); d.setDate(base.getDate() - i); keys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`); }
+      const created = (r) => { const m = /^r_(\d{12,})/.exec(r.id); if (!m) return null; const d = new Date(Number(m[1])); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+      const list = routines.filter(r => keys.some(k => isActiveOn(r, k) && (!created(r) || k >= created(r))));
+      const cell = (r, k) => { // null: bu gün bu ilaç için geçerli değil
+        if (!isActiveOn(r, k) || (created(r) && k < created(r))) return null;
+        const e = (logs[k] || {})[r.id];
+        if (r.asNeeded) { const t = e ? (e.doses && e.doses.length ? e.doses.map(d => d.time) : [e.time]) : []; return { prn: true, times: t }; }
+        if (e) return e.status === 'skipped' ? { s: 'skip' } : { s: 'done', time: e.time };
+        return k < todayKey ? { s: 'none' } : { s: 'wait' };
+      };
+      return { keys, list, cell, todayKey };
+    }
+    function buildReport(n) {
+      const { keys, list, cell } = reportData(n);
+      const fmt = (k, o) => parseDateKey(k).toLocaleDateString('tr-TR', o);
+      const range = `${fmt(keys[0], { day: 'numeric', month: 'long' })} – ${fmt(keys[keys.length - 1], { day: 'numeric', month: 'long', year: 'numeric' })}`;
+      if (!list.length) return `<h1 class="text-lg font-bold">Dozaj özeti</h1><p class="text-sm text-muted mt-2">Bu dönemde kayıtlı rutin yok.</p>`;
+      const th = 'border border-neutral-400 px-1.5 py-1 text-[11px] font-semibold bg-neutral-100';
+      const td = 'border border-neutral-300 px-1.5 py-1 text-[11px]';
+      let sum = `<table class="w-full mt-3"><thead><tr><th class="${th} text-left">İlaç</th><th class="${th}">Saat</th><th class="${th}">Verildi</th><th class="${th}">Es geçildi</th><th class="${th}">Kayıt yok</th></tr></thead><tbody>`;
+      list.forEach(r => {
+        let done = 0, skip = 0, none = 0, prn = 0;
+        keys.forEach(k => { const c = cell(r, k); if (!c) return; if (c.prn) prn += c.times.length; else if (c.s === 'done') done++; else if (c.s === 'skip') skip++; else if (c.s === 'none') none++; });
+        sum += `<tr><td class="${td} font-semibold">${escHtml(r.name)}${r.note && r.note !== 'Esnek pencere' ? `<span class="font-normal text-neutral-600"> (${escHtml(r.note)})</span>` : ''}</td><td class="${td} text-center">${r.asNeeded ? 'Gerekirse' : escHtml(r.time)}</td>`
+          + (r.asNeeded ? `<td class="${td} text-center" colspan="3">${prn} kez verildi</td>` : `<td class="${td} text-center">${done}</td><td class="${td} text-center">${skip}</td><td class="${td} text-center">${none}</td>`) + `</tr>`;
+      });
+      sum += `</tbody></table>`;
+      let det = `<div class="rep-scroll overflow-x-auto"><table class="w-full mt-3"><thead><tr><th class="${th} text-left">Tarih</th>${list.map(r => `<th class="${th}">${escHtml(r.name)}<span class="block font-normal text-neutral-600">${r.asNeeded ? 'gerekirse' : escHtml(r.time)}</span></th>`).join('')}</tr></thead><tbody>`;
+      keys.forEach(k => {
+        det += `<tr><td class="${td} whitespace-nowrap font-medium">${fmt(k, { day: 'numeric', month: 'short', weekday: 'short' })}</td>`;
+        list.forEach(r => {
+          const c = cell(r, k);
+          const v = !c ? '<span class="text-neutral-400">·</span>' : c.prn ? (c.times.length ? c.times.join(', ') : '<span class="text-neutral-400">–</span>') : c.s === 'done' ? escHtml(c.time) : c.s === 'skip' ? 'es' : c.s === 'none' ? '✗' : '<span class="text-neutral-400">…</span>';
+          det += `<td class="${td} text-center font-mono">${v}</td>`;
+        });
+        det += `</tr>`;
+      });
+      det += `</tbody></table></div>`;
+      return `<div><h1 class="text-lg font-bold tracking-tight">Dozaj özeti</h1>
+        <p class="text-xs text-neutral-600 mt-0.5">${range} · son ${n} gün · <span id="report-name-print">${escHtml(document.getElementById('report-name') ? document.getElementById('report-name').value : '')}</span></p>
+        <h2 class="text-xs font-bold uppercase tracking-wider mt-4">Genel</h2>${sum}
+        <h2 class="text-xs font-bold uppercase tracking-wider mt-5">Gün gün</h2>${det}
+        <p class="text-[10px] text-neutral-600 mt-2">Saat = işaretlendiği saat · es = es geçildi · ✗ = kayıt yok (verilmemiş ya da işaretlenmemiş olabilir) · … = bugün henüz işaretlenmemiş · · = o gün geçerli değil</p>
+        <p class="text-[10px] text-neutral-500 mt-3">Bu özet, uygulamadaki işaretlemelerden otomatik üretilmiştir; tıbbi değerlendirme yerine geçmez.</p></div>`;
+    }
+    function renderReport() {
+      document.getElementById('report-body').innerHTML = buildReport(reportDays);
+      document.querySelectorAll('#report-range button').forEach(b => { const on = Number(b.dataset.d) === reportDays; b.classList.toggle('bg-ink', on); b.classList.toggle('text-white', on); });
+    }
+    window.openReport = () => { document.getElementById('report-overlay').classList.remove('hidden'); document.body.style.overflow = 'hidden'; renderReport(); };
+    window.closeReport = () => { document.getElementById('report-overlay').classList.add('hidden'); document.body.style.overflow = ''; };
+    window.setReportDays = (n) => { reportDays = n; renderReport(); };
+
     // --- İŞARETLENMEMİŞ DOZ ŞERİDİ ---
     // Planlanan saatin (aralıksa pencere sonunun) üstünden 1 saat geçtiyse ve kayıt yoksa, bugün için
     // yumuşak bir hatırlatma: doz verilmiş de olabilir, sadece işaretlenmemiştir. Kapat'a basılan doz bu cihazda gizlenir.
@@ -2214,5 +2286,20 @@
       showSlow('Bağlanılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.');
     });
   </script>
+  <div id="report-overlay" class="hidden fixed inset-0 z-[90] bg-white overflow-y-auto" role="dialog" aria-modal="true" aria-label="Doktora özet">
+    <div class="max-w-3xl mx-auto px-4 py-4">
+      <div class="no-print flex flex-wrap items-center gap-2 mb-4 sticky top-0 bg-white py-2 border-b border-line">
+        <div class="flex rounded-md border border-line overflow-hidden text-xs font-semibold" id="report-range">
+          <button data-d="7" onclick="setReportDays(7)" class="px-3 h-8">7 gün</button>
+          <button data-d="14" onclick="setReportDays(14)" class="px-3 h-8 border-l border-line">14 gün</button>
+          <button data-d="30" onclick="setReportDays(30)" class="px-3 h-8 border-l border-line">30 gün</button>
+        </div>
+        <input id="report-name" type="text" maxlength="40" placeholder="Ad (isteğe bağlı)" oninput="document.getElementById('report-name-print').textContent = this.value" class="h-8 px-2 text-xs border border-line rounded-md w-36" />
+        <button onclick="window.print()" class="h-8 px-3 rounded-md bg-ink text-white text-xs font-semibold ml-auto">Yazdır / PDF</button>
+        <button onclick="closeReport()" class="h-8 px-3 rounded-md border border-line text-xs font-semibold text-muted">Kapat</button>
+      </div>
+      <div id="report-body" class="text-ink"></div>
+    </div>
+  </div>
 </body>
 </html>
