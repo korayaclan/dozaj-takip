@@ -1383,13 +1383,24 @@
       const label = escHtml(r.groupName ? `${r.groupName} (${planned})` : `${r.name} (${planned})`);
       const btn = 'h-9 px-3 rounded-md text-xs font-semibold transition active:scale-[0.99]';
       const ask = lateAskId === r.id;
+      const crit = r.priority === 'critical';
+      // Kritik doz kartta "basılı tut" ile verilir; şerit onu atlatmaz, yalnızca karta yönlendirir.
+      const sub = crit ? 'Verilmiş olabilir. İşaretlemek için karttaki düğmeyi basılı tutun.' : (ask ? 'Ne zaman verildi?' : 'Verilmiş olabilir; sadece kaydı yoksa işaretleyin.');
+      const actions = crit
+        ? `<button onclick="lateGoto('${r.id}')" class="${btn} bg-ink text-white">Karta git</button><button onclick="lateHide('${r.id}')" class="${btn} border border-line bg-paper text-muted">Kapat</button>`
+        : (ask
+          ? `<button onclick="lateGive('${r.id}','now')" class="${btn} bg-ink text-white">Şimdi verdim</button><button onclick="lateGive('${r.id}','planned')" class="${btn} bg-ink text-white">${escHtml(planned)} civarı verildi</button><button onclick="lateAsk(null)" class="${btn} border border-line bg-paper text-muted">Vazgeç</button>`
+          : `<button onclick="lateAsk('${r.id}')" class="${btn} bg-ink text-white">Verildi</button><button onclick="lateSkip('${r.id}')" class="${btn} border border-line bg-paper text-ink">Bugün yok</button><button onclick="lateHide('${r.id}')" class="${btn} border border-line bg-paper text-muted">Kapat</button>`);
       el.innerHTML = `<div class="mb-4 p-3.5 rounded-lg border border-line bg-surface shadow-sm" role="status">
         <p class="text-sm font-semibold text-ink">${label} işaretlenmemiş</p>
-        <p class="text-xs text-muted mt-0.5">${ask ? 'Ne zaman verildi?' : 'Verilmiş olabilir; sadece kaydı yoksa işaretleyin.'}</p>
-        <div class="mt-2.5 flex flex-wrap gap-2">${ask
-          ? `<button onclick="lateGive('${r.id}','now')" class="${btn} bg-ink text-white">Şimdi verdim</button><button onclick="lateGive('${r.id}','planned')" class="${btn} bg-ink text-white">${escHtml(planned)} civarı verildi</button><button onclick="lateAsk(null)" class="${btn} border border-line bg-paper text-muted">Vazgeç</button>`
-          : `<button onclick="lateAsk('${r.id}')" class="${btn} bg-ink text-white">Verildi</button>${r.priority === 'critical' ? '' : `<button onclick="lateSkip('${r.id}')" class="${btn} border border-line bg-paper text-ink">Bugün yok</button>`}<button onclick="lateHide('${r.id}')" class="${btn} border border-line bg-paper text-muted">Kapat</button>`}</div></div>`;
+        <p class="text-xs text-muted mt-0.5">${sub}</p>
+        <div class="mt-2.5 flex flex-wrap gap-2">${actions}</div></div>`;
     }
+    window.lateGoto = (id) => {
+      const h = document.getElementById(`hold-${id}`); if (!h) return;
+      h.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      h.classList.add('ring-2', 'ring-signal'); setTimeout(() => h.classList.remove('ring-2', 'ring-signal'), 1800);
+    };
     window.lateAsk = (id) => { lateAskId = id; renderLateStrip(); };
     window.lateGive = async (id, when) => { lateAskId = null; const r = routines.find(x => x.id === id); await recordAction(id, 'done', when === 'planned' && r ? r.time.split(/[–-]/)[0].trim() : undefined); renderLateStrip(); };
     window.lateSkip = async (id) => { lateAskId = null; await recordAction(id, 'skipped'); renderLateStrip(); };
