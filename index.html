@@ -126,7 +126,7 @@
   <div id="screen-viewer" class="hidden max-w-lg mx-auto px-4 pt-5 pb-10" aria-live="polite"></div>
 
   <div id="screen-onboarding" class="hidden max-w-md mx-auto px-4 pt-6 pb-4 sm:pt-12">
-    <p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">BAŞLANGIÇ</p>
+    <div class="flex items-center justify-between"><p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted">BAŞLANGIÇ</p><button onclick="setLang(LANG==='en'?'tr':'en')" class="lang-btn text-xs text-muted hover:text-ink underline underline-offset-4">English</button></div>
     <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-ink mt-0.5">Dozaj Takip</h1>
     <p class="text-[13px] text-muted mt-1.5 leading-snug">Şurup, ilaç ve vitaminlerin ne zaman verildiğini işaretle. Hangi dozun verildiği, geçmişte de tek bakışta görünür.</p>
 
@@ -329,6 +329,7 @@
         <button onclick="openShare()" class="hover:text-ink underline underline-offset-4 transition">Görüntüleme bağlantısı</button>
         <button onclick="editNames()" id="btn-edit-names" class="hidden hover:text-ink underline underline-offset-4 transition">Adları düzenle</button>
         <a href="gizlilik.html" class="hover:text-ink underline underline-offset-4 transition">Gizlilik</a>
+        <button onclick="setLang(LANG==='en'?'tr':'en')" class="lang-btn hover:text-ink underline underline-offset-4 transition">English</button>
       </div>
     </section>
 
@@ -527,6 +528,413 @@
   </div>
 
   <!-- FIREBASE ENTEGRASYONLU UYGULAMA MOTORU -->
+  <!-- I18N-BEGIN -->
+  <script>
+  /* --- DİL / LANGUAGE ---
+     Arayüz Türkçe yazılmıştır. İngilizce seçilince ekrandaki metinler bu tabloyla çevrilir (tam eşleşme + kalıplar).
+     Tabloda olmayan metin Türkçe kalır. Dil seçimi bu cihazda saklanır (dozaj_lang). */
+  (function () {
+    var lang = 'tr'; try { lang = localStorage.getItem('dozaj_lang') || 'tr'; } catch (e) {}
+    window.LANG = lang === 'en' ? 'en' : 'tr';
+    window.LOC = window.LANG === 'en' ? 'en-GB' : 'tr-TR';
+    document.documentElement.lang = window.LANG;
+    window.setLang = function (l) { try { localStorage.setItem('dozaj_lang', l); } catch (e) {} location.reload(); };
+    var collect = !!window.__I18N_COLLECT;
+    window.T = function (s) { return s; };
+    document.querySelectorAll('.lang-btn').forEach(function (b) { b.textContent = window.LANG === 'en' ? 'Türkçe' : 'English'; });
+    if (window.LANG !== 'en' && !collect) return;
+    var EN = {
+      "Dozaj — Günlük Takip": "Dozaj — Daily Tracker",
+      "Bağlanıyor...": "Connecting...",
+      "Bağlantı beklenenden uzun sürüyor. İnternetinizi kontrol edin; bağlanınca kendiliğinden devam eder.": "This is taking longer than expected. Check your internet; it will continue on its own once connected.",
+      "Tekrar dene": "Try again",
+      "BAŞLANGIÇ": "GET STARTED",
+      "Dozaj Takip": "Dozaj Tracker",
+      "Şurup, ilaç ve vitaminlerin ne zaman verildiğini işaretle. Hangi dozun verildiği, geçmişte de tek bakışta görünür.": "Mark when syrups, medicines and vitamins were given. Which dose was given is visible at a glance, in the past too.",
+      "Hemen başla": "Start now",
+      "Tek başına başlarsın, eşini ya da ailenden birini sonradan ekleyebilirsin": "You start on your own; you can add your partner or a family member later",
+      "HESABINLA GİRİŞ": "SIGN IN WITH YOUR ACCOUNT",
+      "veya": "or",
+      "Google ile devam et": "Continue with Google",
+      "AİLE İLE PAYLAŞ": "SHARE WITH FAMILY",
+      "Bu telefon kimin?": "Whose phone is this?",
+      "Adları değiştir": "Change names",
+      "Anne": "Mom",
+      "Baba": "Dad",
+      "Örn. Ayşe / Mehmet ya da Kızım / Oğlum. Sonradan Ayarlar'dan da değişir.": "E.g. Jane / John or My daughter / My son. You can change this later in Settings too.",
+      "Yeni Aile Oluştur": "Create New Family",
+      "veya davet koduyla giriş yap": "or sign in with an invite code",
+      "Bağlan": "Connect",
+      "Bu telefon geçsin, eski telefonu kapat": "Use this phone and sign out the old one",
+      "Davet": "Invite",
+      "Takip": "Tracker",
+      "Geçmiş": "History",
+      "Ekle": "Add",
+      "iPhone Bildirim Kurulumu": "iPhone Notification Setup",
+      "iOS'ta bildirim alabilmek için Safari'de alttaki": "To get notifications on iOS, tap the",
+      "Paylaş": "Share",
+      "simgesine dokunup": "icon at the bottom of Safari, choose",
+      "\"Ana Ekrana Ekle\"": "\"Add to Home Screen\"",
+      "deyin ve uygulamayı Ana Ekrandan açın.": "and open the app from your Home Screen.",
+      "Bildirimler kapalı": "Notifications are off",
+      "Eşinizin onaylarını ve alarmları almak için açın.": "Turn on to receive your partner's confirmations and alarms.",
+      "Doz hatırlatmalarını almak için açın.": "Turn on to receive dose reminders.",
+      "Bildirimleri Aç": "Turn On Notifications",
+      "Bugün": "Today",
+      "Dün": "Yesterday",
+      "BUGÜN": "TODAY",
+      "DÜN": "YESTERDAY",
+      "GEÇMİŞ KAYIT": "PAST RECORD",
+      "Günlük durum": "Daily status",
+      "Listeyi düzenle / sil": "Edit / delete list",
+      "Düzenlemeyi bitir": "Finish editing",
+      "Aile kodundan çık": "Leave family code",
+      "Bu telefondan çık": "Sign out of this phone",
+      "Eş / aile ekle": "Add partner / family",
+      "Hesap bağlı:": "Account linked:",
+      "Hesabını bağla": "Link your account",
+      "Google ile bağla": "Link with Google",
+      "Kayıtları indir (CSV)": "Download records (CSV)",
+      "Görüntüleme bağlantısı": "View-only link",
+      "Adları düzenle": "Edit names",
+      "Gizlilik": "Privacy",
+      "KAYIT DEFTERİ": "RECORD LOG",
+      "Son 14 Gün": "Last 14 Days",
+      "Doktora özet": "Summary for doctor",
+      "GÜNLÜK DETAYLAR": "DAILY DETAILS",
+      "Yeni Rutin Ekle": "Add New Routine",
+      "Şurup / Takviye Adı": "Syrup / Supplement Name",
+      "Kimin için": "Who is it for",
+      "(isteğe bağlı)": "(optional)",
+      "+ Çocuk ekle": "+ Add child",
+      "Simge": "Icon",
+      "Saat / Aralık": "Time / Range",
+      "Not": "Note",
+      "Günde kaç doz?": "How many doses a day?",
+      "Diğer doz saatleri otomatik hesaplandı, değiştirebilirsiniz.": "The other dose times were calculated automatically; you can change them.",
+      "Daha fazla seçenek": "More options",
+      "Gerektiğinde kullanılır": "Used as needed",
+      "Saati yok; ateş düşürücü gibi, ihtiyaç olunca \"Verdim\" dersin.": "No set time; like a fever reducer, you tap \"Given\" when it is needed.",
+      "En az kaç saat arayla?": "At least how many hours apart?",
+      "Kaç gün kullanılacak?": "How many days will it be used?",
+      "Süre dolunca doz kendiliğinden biter.": "The dose ends on its own when the time is up.",
+      "Onay Tipi": "Confirmation Type",
+      "Kritik (Basılı Tut)": "Critical (Press and Hold)",
+      "Baloncuklu dolum + Israrlı alarm": "Bubble fill + persistent alarm",
+      "Standart (Tek Tık)": "Standard (One Tap)",
+      "Hızlı onay + Es geçme": "Quick confirm + skip",
+      "İptal": "Cancel",
+      "Kaydet": "Save",
+      "Dozu Düzenle": "Edit Dose",
+      "E-posta adresi": "Email address",
+      "E-posta bağlantısı gönder": "Send email link",
+      "Aile serisi": "Family streak",
+      "Serin": "Your streak",
+      "Aileden birini davet et": "Invite a family member",
+      "Örn: D Vitamini": "E.g. Vitamin D",
+      "14:00 veya 10:00-17:00": "14:00 or 10:00-17:00",
+      "Örn: 1 ölçek": "E.g. 1 scoop",
+      "Örn: 6": "E.g. 6",
+      "Örn: 7": "E.g. 7",
+      "Kapat": "Close",
+      "Boş = süresiz": "Empty = no limit",
+      "Boş bırakılırsa herkes için": "Everyone if left empty",
+      "Diğer çocuk": "Another child",
+      "Kaldır": "Remove",
+      "Notu düzenle": "Edit note",
+      "Not ekle": "Add note",
+      "Hepsi": "All",
+      "Herkes": "Everyone",
+      "Ad (isteğe bağlı)": "Name (optional)",
+      "Yazdır / PDF": "Print / PDF",
+      "7 gün": "7 days",
+      "14 gün": "14 days",
+      "30 gün": "30 days",
+      "Dozaj özeti": "Dose summary",
+      "Genel": "Overall",
+      "Gün gün": "Day by day",
+      "Notlar": "Notes",
+      "Tarih": "Date",
+      "İlaç": "Medicine",
+      "Planlanan saat": "Planned time",
+      "Verildiği saat": "Time given",
+      "Durum": "Status",
+      "Kim": "Who",
+      "Saat": "Time",
+      "Verildi": "Given",
+      "Es geçildi": "Skipped",
+      "es": "skip",
+      "Kayıt yok": "No record",
+      "Verildi Olarak İşaretle": "Mark as Given",
+      "Bugün Yok": "Not Today",
+      "Bugün yok": "Not today",
+      "Verdim": "Given",
+      "Bir doz daha": "One more dose",
+      "Yine de ver": "Give anyway",
+      "Yine de işaretle": "Mark anyway",
+      "Geri al": "Undo",
+      "Dozu sonlandır": "End dose",
+      "Sil": "Delete",
+      "Düzenle": "Edit",
+      "Yeniden başlat": "Restart",
+      "Sonlandırılanlar": "Ended",
+      "Sonlandır": "End",
+      "Henüz verilmedi": "Not given yet",
+      "Verilmedi": "Not given",
+      "Gerekirse": "As needed",
+      "gerekirse": "as needed",
+      "Gerektiğinde": "As needed",
+      "VERMEK İÇİN BASILI TUT": "PRESS AND HOLD TO GIVE",
+      "Henüz doz eklenmedi": "No doses added yet",
+      "Sağ üstteki": "Use the",
+      "düğmesiyle ilk şurup ya da takviyeni ekle.": "button at the top right to add your first syrup or supplement.",
+      "Kayıt girilmemiş.": "No entries.",
+      "Güne git →": "Go to day →",
+      "Sabah": "Morning",
+      "Öğle": "Noon",
+      "Akşam": "Evening",
+      "Gece": "Night",
+      "Şurup": "Syrup",
+      "Kapsül": "Capsule",
+      "Damla": "Drops",
+      "Saşe": "Sachet",
+      "Krem": "Cream",
+      "Sprey": "Spray",
+      "İğne": "Injection",
+      "Karta git": "Go to card",
+      "Ne zaman verildi?": "When was it given?",
+      "Şimdi verdim": "Gave it now",
+      "Verilmiş olabilir. İşaretlemek için karttaki düğmeyi basılı tutun.": "It may already have been given. To mark it, press and hold the button on the card.",
+      "Verilmiş olabilir; sadece kaydı yoksa işaretleyin.": "It may already have been given; mark it only if there is no record.",
+      "Bekliyor": "Waiting",
+      "İşaretlenmemiş": "Not marked",
+      "Rozetler": "Badges",
+      "Filiz": "Sprout",
+      "Yıldız": "Star",
+      "Kalkan": "Shield",
+      "Kupa": "Trophy",
+      "gün": "days",
+      "En uzun:": "Longest:",
+      "Tüm planlı dozları işaretlenen (verildi ya da es geçildi) ardışık günler.": "Consecutive days when all planned doses were marked (given or skipped).",
+      "Bugünün tüm dozları işaretlenince seri başlar.": "The streak starts once all of today's doses are marked.",
+      "Bu dönemde kayıtlı rutin yok.": "No routines recorded in this period.",
+      "Saat = işaretlendiği saat · es = es geçildi · ✗ = kayıt yok (verilmemiş ya da işaretlenmemiş olabilir) · … = bugün henüz işaretlenmemiş · · = o gün geçerli değil": "Time = time it was marked · skip = skipped · ✗ = no record (may not have been given or not marked) · … = not yet marked today · · = not applicable that day",
+      "Bu özet, uygulamadaki işaretlemelerden otomatik üretilmiştir; tıbbi değerlendirme yerine geçmez.": "This summary was generated automatically from the marks in the app; it is not a substitute for medical evaluation.",
+      "Verilmiş olabilir": "May have been given",
+      "İlaç / Takviye": "Medicine / Supplement",
+      "Bağlantı hazırlanıyor...": "Preparing link...",
+      "Bağlantı oluştur": "Create link",
+      "Bağlantıyı kapat": "Turn off link",
+      "Bağlantının süresi dolmuş": "The link has expired",
+      "Yeni bir bağlantı oluşturmak için eskisini temizleyelim.": "Let's clear the old one to create a new link.",
+      "Temizle ve yeni oluştur": "Clear and create new",
+      "Ne kadar süre geçerli olsun?": "How long should it be valid?",
+      "1 gün": "1 day",
+      "Kopyala": "Copy",
+      "Tamam": "OK",
+      "TAMAM": "OK",
+      "Vazgeç": "Cancel",
+      "yalnızca görebilir": "view only",
+      "Bağlantıyı yalnızca güvendiğiniz kişiyle paylaşın. İsterseniz aşağıdan hemen kapatabilirsiniz.": "Only share the link with someone you trust. You can turn it off right away below if you wish.",
+      "Bağlantı kapatıldı": "Link turned off",
+      "Bağlantı kapatılamadı": "Could not turn off the link",
+      "Bağlantı oluşturulamadı": "Could not create the link",
+      "Bağlantı kopyalandı": "Link copied",
+      "Bugünkü dozları buradan görebilirsin": "You can see today's doses here",
+      "Yalnızca görüntüleme": "View only",
+      "Bu bağlantı geçerli değil": "This link is not valid",
+      "Süresi dolmuş ya da kapatılmış olabilir. Yeni bir bağlantı için aileden birine ulaşın.": "It may have expired or been turned off. Ask a family member for a new link.",
+      "Bugün için kayıtlı doz yok.": "No doses recorded for today.",
+      "Davet kodu hazırlanıyor...": "Preparing invite code...",
+      "Davet kodu oluşturulamadı": "Could not create the invite code",
+      "Davet kodu kopyalandı": "Invite code copied",
+      "Eşinizin ya da aileden birinin telefonunda \"kodla giriş yap\" alanına bu kodu yazın. 15 dakika geçerli ve tek kullanımlıktır.": "Enter this code in the \"sign in with a code\" field on your partner's or a family member's phone. It is valid for 15 minutes and can be used once.",
+      "KOD": "CODE",
+      "KOPYALANDI": "COPIED",
+      "E-posta adresiniz": "Your email address",
+      "Bağlantıyı istediğiniz adresi yazın.": "Enter the address where you want the link.",
+      "Giriş yap": "Sign in",
+      "Bu aileye erişiminiz yok: bu telefondaki oturum aile üyeleri arasında değil. Daha önce bağladığınız hesapla (Google / e-posta) giriş yapın ya da aile telefonundan yeni bir davet kodu isteyin.": "You do not have access to this family: this phone's session is not among the family members. Sign in with the account you linked before (Google / email) or ask for a new invite code from the family phone.",
+      "E-posta adresi girilmediği için giriş tamamlanamadı. Bağlantıyı yeniden açın.": "Sign-in could not be completed because no email address was entered. Open the link again.",
+      "E-posta hesabınıza bağlandı. Dozaj uygulamasına dönebilirsiniz; yeni bir telefonda bu e-postayla giriş yapabilirsiniz.": "Linked to your email account. You can return to the Dozaj app; on a new phone you can sign in with this email.",
+      "Bağlantıdaki davet süresi dolmuş. Uygulamadan e-posta bağlantısını yeniden isteyin.": "The invitation in the link has expired. Request the email link again from the app.",
+      "Telefonu değiştirirseniz yeni telefonda aynı hesapla giriş yapmanız yeterli.": "If you change phones, just sign in with the same account on the new phone.",
+      "Telefonu değiştirirseniz kayıtlarınıza dönebilmek için aşağıdan Google ile hesabınızı bağlayın.": "If you change phones, link your Google account below so you can get back to your records.",
+      "Kayıtlar ve geçmiş yeni adlarla görünür. En fazla 12 harf.": "Records and history will appear with the new names. Up to 12 characters.",
+      "Birinci kişi": "First person",
+      "İkinci kişi": "Second person",
+      "İki ad farklı olmalı": "The two names must be different",
+      "UYARI": "WARNING",
+      "BİLGİ": "INFO",
+      "Adlar kaydedildi": "Names saved",
+      "Google ile giriş yapılıyor...": "Signing in with Google...",
+      "Hazırlanıyor...": "Preparing...",
+      "Oluşturuluyor...": "Creating...",
+      "Açılıyor...": "Opening...",
+      "Çıkış yapılıyor...": "Signing out...",
+      "Bağlantı kurulamadı. İnternetinizi kontrol edip tekrar deneyin.": "Could not connect. Check your internet and try again.",
+      "Bağlanılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.": "Could not connect. Check your internet connection and try again.",
+      "Bu hesap başka bir telefonda açıldığı için bu telefondaki oturum kapatıldı.": "This phone was signed out because the account was opened on another phone.",
+      "Eş / aile eklensin mi?": "Add a partner / family member?",
+      "Eşiniz uygulamada \"Baba\"yı seçip size göstereceğimiz davet koduyla giriş yapar. Bu telefon \"Anne\" olarak kalır ve kayıtlarınız korunur.": "Your partner picks \"Dad\" in the app and signs in with the invite code we show you. This phone stays as \"Mom\" and your records are kept.",
+      "Bu telefon esas telefon olsun mu?": "Make this the main phone?",
+      "Bu profilin eski telefondaki oturumu kapanır (tek seferde yalnızca bir telefon açık kalır).": "This profile's session on the old phone will be closed (only one phone can stay signed in at a time).",
+      "Evet, bu telefon": "Yes, this phone",
+      "Davet kodu geçersiz ya da süresi dolmuş. Aile telefonundan yeni bir kod isteyin.": "The invite code is invalid or has expired. Ask for a new code from the family phone.",
+      "Davet kodu 8 haneli olmalı.": "The invite code must be 8 digits.",
+      "Bu aile artık davet koduyla giriliyor. Aile telefonunda üstteki \"Davet\" düğmesinden kod alın.": "This family now requires an invite code. Get a code from the \"Invite\" button at the top of the family phone.",
+      "Bu kod bulunamadı. Kodu kontrol edin.": "This code was not found. Check the code.",
+      "Bu hesap başka bir telefonda açık. Eski telefonda \"Bu telefondan çık\" yapın ya da eski telefona erişemiyorsanız aşağıdaki düğmeyle bu telefonu esas yapın.": "This account is open on another phone. Choose \"Sign out of this phone\" on the old phone, or if you cannot reach it, use the button below to make this phone the main one.",
+      "Çıkış yapılsın mı?": "Sign out?",
+      "Hesabınız bağlı olmadığı için çıkarsanız bu kayıtlara bir daha ulaşamazsınız. Önce aşağıdan Google ile bağlamanız önerilir.": "Because your account is not linked, you will not be able to reach these records again if you sign out. We suggest linking with Google below first.",
+      "Hesabınız bağlı olmadığı için tekrar girmek istediğinizde aile telefonundan yeni bir davet kodu almanız gerekir. Kayıtlar silinmez.": "Because your account is not linked, you will need a new invite code from the family phone to get back in. Records are not deleted.",
+      "Çıkış yap": "Sign out",
+      "Yine de çık": "Sign out anyway",
+      "Bildirimler aktifleştirildi!": "Notifications enabled!",
+      "HAZIR": "READY",
+      "İzin Verilmedi": "Permission Denied",
+      "İndirilecek kayıt yok": "No records to download",
+      "Geçmiş gün kayıtları değiştirilemez": "Past days cannot be changed",
+      "KİLİTLİ": "LOCKED",
+      "Not kaydedilemedi": "Could not save the note",
+      "Geçmiş güne kayıt girilemez": "Cannot add records to a past day",
+      "HENÜZ DEĞİL": "NOT YET",
+      "Bu doz zaten işaretli": "This dose is already marked",
+      "Henüz erken olabilir": "It may be too early",
+      "Az önce doz verilmiş": "A dose was just given",
+      "Es geçildi olarak kaydedildi": "Recorded as skipped",
+      "Eşinize bildirim gönderilemedi": "Could not notify your partner",
+      "Eşinize bildirim gönderilemedi (bağlantı)": "Could not notify your partner (connection)",
+      "HATA": "ERROR",
+      "İZİN YOK": "NOT ALLOWED",
+      "GERİ DÖNÜYOR...": "UNDOING...",
+      "Doz güncellendi": "Dose updated",
+      "Birden fazla doz için ilk saati 09:00 gibi yazın.": "For several doses, enter the first time like 09:00.",
+      "Tüm doz saatleri 09:00 gibi yazılmalı.": "All dose times must be written like 09:00.",
+      "Saat 14:00 ya da 10:00-17:00 biçiminde yazılmalı.": "The time must be written like 14:00 or 10:00-17:00.",
+      "Listeden kalkar ve hatırlatma gitmez. Geçmiş kayıtlar saklanır; \"Yeniden başlat\" ile geri açabilirsiniz.": "It is removed from the list and reminders stop. Past records are kept; you can bring it back with \"Restart\".",
+      "Oluşacak:": "Will create:",
+      "İsim": "Name",
+      "örn. yarım içti": "e.g. drank half",
+      "Sen": "You",
+      "verildi": "given",
+      "es geçildi": "skipped",
+      "Bakıcı ya da aileden biri bu bağlantıyla bugünkü ve dünkü dozları": "A caregiver or family member can see today's and yesterday's doses with this link,",
+      "Bağlantıya sahip olan, bugünkü ve dünkü dozları": "Anyone with the link can see today's and yesterday's doses,",
+      ". Giriş gerekmez, hiçbir şeyi değiştiremez. Süre dolunca ya da siz kapatınca çalışmaz.": "; no sign-in needed and nothing can be changed. It stops working once it expires or when you turn it off."
+
+    };
+    function nm(x) { x = String(x); return x === 'Anne' ? 'Mom' : x === 'Baba' ? 'Dad' : x === 'Sen' ? 'You' : x; }
+    function ago(s) {
+      s = String(s).trim(); var m;
+      if (s === 'az önce') return 'just now';
+      if (s === 'dün') return 'yesterday';
+      if ((m = s.match(/^(\d+) dk önce$/))) return m[1] + ' min ago';
+      if ((m = s.match(/^(\d+) sa(?: (\d+) dk)? önce$/))) return m[1] + ' h' + (m[2] ? ' ' + m[2] + ' min' : '') + ' ago';
+      if ((m = s.match(/^(\d+) gün önce$/))) return m[1] + (m[1] === '1' ? ' day' : ' days') + ' ago';
+      return s;
+    }
+    function when(s) { return String(s).replace(/^bugün /, 'today ').replace(/^dün /, 'yesterday '); }
+    function plural(n, w) { return n + ' ' + w + (Number(n) === 1 ? '' : 's'); }
+    function inner(s) { var t = tr(s); return t === null ? s : t; }
+    var PART = { 'Sabah': 'Morning', 'Öğle': 'Noon', 'Akşam': 'Evening', 'Gece': 'Night' };
+    var RULES = [
+      [/^(\d+) gün$/, function (m, n) { return plural(n, 'day'); }],
+      [/^(\d+) gün kaldı$/, function (m, n) { return plural(n, 'day') + ' left'; }],
+      [/^(\d+)\/(\d+) doz$/, function (m, a, b) { return a + '/' + b + ' doses'; }],
+      [/^(\d{1,2}:\d{2}) civarı verildi$/, function (m, t) { return 'Given around ' + t; }],
+      [/^(\d+) kez verildi$/, function (m, n) { return 'Given ' + (n === '1' ? 'once' : n + ' times'); }],
+      [/^(\d+) kez · (.+)$/, function (m, n, t) { return (n === '1' ? 'once' : n + ' times') + ' · ' + t; }],
+      [/^(\d{1,2}:\d{2}) SAATİNDE AÇILIR$/, function (m, t) { return 'OPENS AT ' + t; }],
+      [/^(.+) · son (\d+) gün ·$/, function (m, a, n) { return a + ' · last ' + n + ' days ·'; }],
+      [/^; hiçbir şeyi değiştiremez\. (.+) saatine kadar geçerli\.$/, function (m, t) { return '; nothing can be changed. Valid until ' + when(t) + '.'; }],
+      [/^Bu sayfa yalnızca görüntüleme içindir\. Bağlantı (.+) saatine kadar geçerlidir\.$/, function (m, t) { return 'This page is for viewing only. The link is valid until ' + when(t) + '.'; }],
+      [/^Son güncelleme: (.+)$/, function (m, t) { return 'Last updated: ' + when(t); }],
+      [/^(.+) işaretlenmemiş$/, function (m, g) { return inner(g) + ' not marked'; }],
+      [/^(.+?) (az önce|\d+ dk önce|\d+ sa(?: \d+ dk)? önce|dün|\d+ gün önce) bir doz verdi \((.+)\)\. Yine de bir doz daha verelim mi\?$/, function (m, w, a, t) { return nm(w) + ' gave a dose ' + ago(a) + ' (' + t + '). Give one more anyway?'; }],
+      [/^(.+?) bu dozu (\S+) saatinde (verdi|es geçti)\. Yine de (verildi|es geçildi) olarak işaretleyelim mi\?$/, function (m, w, t, v, s) { return nm(w) + (v === 'verdi' ? ' gave' : ' skipped') + ' this dose at ' + t + '. Mark it as ' + (s === 'verildi' ? 'given' : 'skipped') + ' anyway?'; }],
+      [/^Bu doz (\S+) saatinde (verilmiş|es geçilmiş)\. Yine de (verildi|es geçildi) olarak işaretleyelim mi\?$/, function (m, t, v, s) { return 'This dose was ' + (v === 'verilmiş' ? 'given' : 'skipped') + ' at ' + t + '. Mark it as ' + (s === 'verildi' ? 'given' : 'skipped') + ' anyway?'; }],
+      [/^Son doz (.+?) verildi; en az (\d+) saat ara önerilmişti\.$/, function (m, a, h) { return 'The last dose was given ' + ago(a) + '; at least ' + h + ' hours apart was recommended.'; }],
+      [/^Son doz: (.+?)(?: · en az (\d+) sa ara)?$/, function (m, a, h) { return 'Last dose: ' + ago(a) + (h ? ' · at least ' + h + ' h apart' : ''); }],
+      [/^En az (\d+) sa arayla$/, function (m, h) { return 'At least ' + h + ' h apart'; }],
+      [/^Bu doz (\S+) saatinde açılır$/, function (m, t) { return 'This dose opens at ' + t; }],
+      [/^(.+)'(?:ya|ye|na|ne|a|e) iletildi: (.+)$/, function (m, w, d) { return 'Sent to ' + nm(w) + ': ' + d; }],
+      [/^(.+)'(?:ya|ye|na|ne|a|e) iletildi \(Es geçildi\)$/, function (m, w) { return 'Sent to ' + nm(w) + ' (skipped)'; }],
+      [/^Kaydedildi: (.+)$/, function (m, d) { return 'Saved: ' + d; }],
+      [/^(.+) henüz bildirimleri açmamış$/, function (m, w) { return nm(w) + ' has not turned on notifications yet'; }],
+      [/^Bunu sadece (.+) geri alabilir$/, function (m, w) { return 'Only ' + nm(w) + ' can undo this'; }],
+      [/^"(.+)" sonlandırılsın mı\?$/, function (m, d) { return 'End "' + d + '"?'; }],
+      [/^(.+) sonlandırıldı$/, function (m, d) { return d + ' ended'; }],
+      [/^(.+) için kısa bir not\. En fazla (\d+) harf\.$/, function (m, d, n) { return 'A short note for ' + d + '. Up to ' + n + ' characters.'; }],
+      [/^Davet kodu: (.+)$/, function (m, c) { return 'Invite code: ' + c; }],
+      [/^Hesabınız Google ile bağlandı: (.+)$/, function (m, e) { return 'Your account was linked with Google: ' + e; }],
+      [/^(.+) ile giriş yapıldı ama bu (hesap|e-posta) henüz bir aileye bağlı değil\. Yeni bir takip başlatın ya da davet koduyla bağlanın; (?:hesap|e-posta) otomatik eklenir\.$/, function (m, e) { return 'Signed in with ' + e + ' but this account is not linked to a family yet. Start a new tracker or connect with an invite code; it is added automatically.'; }],
+      [/^Bağlantı (.+) adresine gönderildi\. Postanızdan \(gereksiz klasörüne de bakın\) bağlantıya dokunun\.$/, function (m, e) { return 'The link was sent to ' + e + '. Tap the link in your inbox (check the spam folder too).'; }],
+      [/^Bağlantı gönderilemedi \((.+)\)\. Adresi kontrol edip tekrar deneyin\.$/, function (m, e) { return 'Could not send the link (' + e + '). Check the address and try again.'; }],
+      [/^Google ile giriş yapılamadı \((.+)\)\.$/, function (m, e) { return 'Could not sign in with Google (' + e + ').'; }],
+      [/^E-posta bağlantısı geçersiz, süresi dolmuş ya da farklı adresle açıldı\. Yeni bir bağlantı isteyin\. \((.+)\)$/, function (m, e) { return 'The email link is invalid, has expired or was opened with a different address. Request a new link. (' + e + ')'; }],
+      [/^Bu aile kodunda "(.+)" oturumu başka bir telefonda açık olduğu için bu telefondaki oturum kapatıldı\.$/, function (m, w) { return 'This phone was signed out because the "' + nm(w) + '" session in this family code is open on another phone.'; }],
+      [/^Bu aile kodunda "(.+?)" zaten başka bir telefonda açık; ikinci (.+?) oturumu açılamaz\. Bu telefon (.+?) ise (.+?)'(?:yı|yi|ı|i|nı|ni|u|ü) seçin\. (.+?) telefonunu değiştirdiyseniz eski telefonda "Aile kodundan çık" yapın ya da eskisine erişemiyorsanız aşağıdaki düğmeyle bu telefonu esas yapın\.$/, function (m, a, a2, o, o2, a3) { return '"' + nm(a) + '" is already open on another phone in this family code; a second ' + nm(a) + ' session cannot be opened. If this phone is ' + nm(o) + ', pick ' + nm(o) + '. If you changed ' + nm(a) + '\'s phone, choose "Leave family code" on the old phone, or if you cannot reach it, use the button below to make this phone the main one.'; }],
+      [/^Kayıtlar silinmez\. Hesabınızdan \((.+)\) da çıkılır; aynı hesapla tekrar girebilirsiniz\.$/, function (m, e) { return 'Records are not deleted. You will also be signed out of your account (' + e + '); you can sign back in with the same account.'; }],
+      [/^KAYIT DEFTERİ · (.+)$/, function (m, d) { return 'RECORD LOG · ' + d; }],
+      [/^Dozaj özeti · (.+)$/, function (m, w) { return 'Dose summary · ' + w; }],
+      [/^(.+) \((Sabah|Öğle|Akşam|Gece)\)$/, function (m, d, p) { return d + ' (' + PART[p] + ')'; }],
+      [/^(.+) \((\d)\. doz\)$/, function (m, d, n) { return d + ' (dose ' + n + ')'; }],
+      [/^(\d)\. doz saati$/, function (m, n) { return 'Dose ' + n + ' time'; }],
+      [/^✓ (.+) verdi · (.+)$/, function (m, w, t) { return '✓ Given by ' + nm(w) + ' · ' + t; }],
+      [/^✓ Verildi · (.+)$/, function (m, t) { return '✓ Given · ' + t; }],
+      [/^(.+) tarafından verildi$/, function (m, w) { return 'Given by ' + nm(w); }],
+      [/^(.+) tarafından es geçildi$/, function (m, w) { return 'Skipped by ' + nm(w); }],
+      [/^Es geçildi \((.+)\)$/, function (m, w) { return 'Skipped (' + nm(w) + ')'; }],
+      [/^\((Anne|Baba)\)$/, function (m, w) { return '(' + nm(w) + ')'; }],
+      [/^(Anne|Baba|Sen) · (.+)$/, function (m, w, t) { return nm(w) + ' · ' + (t === 'giriş yapılmadı' ? 'not signed in' : t); }],
+      [/^(.+) verdi$/, function (m, w) { return 'Given by ' + nm(w); }],
+      [/^(.+) es geçti$/, function (m, w) { return 'Skipped by ' + nm(w); }]
+
+    ];
+    function tr(core) {
+      if (Object.prototype.hasOwnProperty.call(EN, core)) return EN[core];
+      for (var i = 0; i < RULES.length; i++) {
+        var m = core.match(RULES[i][0]);
+        if (m) return typeof RULES[i][1] === 'function' ? RULES[i][1].apply(null, m) : core.replace(RULES[i][0], RULES[i][1]);
+      }
+      return null;
+    }
+    var sent = {};
+    function report(core) {
+      if (!collect || sent[core] || !/[A-Za-zÇĞİÖŞÜçğıöşü]/.test(core)) return;
+      sent[core] = 1; try { navigator.sendBeacon('http://seen.test/log', core); } catch (e) {}
+    }
+    window.T = function (s) { if (window.LANG !== 'en') return s; var t = tr(String(s).trim()); return t === null ? s : t; };
+    function fix(v) {
+      var core = v.trim(); if (!core) return v;
+      var t = tr(core); if (t === null) { report(core); return v; }
+      if (collect && window.LANG !== 'en') return v;
+      return v.replace(core, function () { return t; });
+    }
+    function textNode(n) { var v = n.nodeValue, w = fix(v); if (w !== v) n.nodeValue = w; }
+    var ATTRS = ['placeholder', 'title', 'aria-label'];
+    function attrs(el) { ATTRS.forEach(function (a) { var v = el.getAttribute && el.getAttribute(a); if (v) { var w = fix(v); if (w !== v) el.setAttribute(a, w); } }); }
+    function walk(root) {
+      if (!root) return;
+      if (root.nodeType === 3) { textNode(root); return; }
+      if (root.nodeType !== 1) return;
+      var tag = root.tagName; if (tag === 'SCRIPT' || tag === 'STYLE') return;
+      attrs(root);
+      for (var c = root.firstChild; c; c = c.nextSibling) walk(c);
+    }
+    document.title = fix(document.title);
+    walk(document.body);
+    new MutationObserver(function (ms) {
+      ms.forEach(function (m) {
+        if (m.type === 'childList') m.addedNodes.forEach(walk);
+        else if (m.type === 'characterData') textNode(m.target);
+        else if (m.type === 'attributes') attrs(m.target);
+      });
+    }).observe(document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
+  })();
+  </script>
+  <!-- I18N-END -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, signInAnonymously, isSignInWithEmailLink, sendSignInLinkToEmail, signInWithEmailLink, EmailAuthProvider, linkWithCredential, signOut, GoogleAuthProvider, signInWithPopup, linkWithPopup, signInWithCredential } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -558,7 +966,7 @@
     if (messaging) {
       onMessage(messaging, (payload) => {
         const n = payload.notification || {};
-        const nowTime = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+        const nowTime = new Date().toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' });
         showToast([n.title, n.body].filter(Boolean).join(' — ') || 'Yeni bildirim', nowTime);
         if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
         playConfirmTone();
@@ -1330,13 +1738,13 @@
     // Tüm kayıtları Excel / Google E-Tablolar'da açılabilen CSV olarak indirir (yedek ve doktora göstermek için)
     window.exportRecords = () => {
       const esc = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
-      const rows = [['Tarih', 'İlaç', 'Planlanan saat', 'Durum', 'Kim', 'Verildiği saat', 'Not']];
+      const rows = [['Tarih', 'İlaç', 'Planlanan saat', 'Durum', 'Kim', 'Verildiği saat', 'Not'].map(T)];
       Object.keys(logs).sort().forEach(day => {
         const dl = logs[day] || {};
         routines.forEach(r => {
           const e = dl[r.id];
           if (!e) return;
-          const status = e.status === 'skipped' ? 'Es geçildi' : 'Verildi';
+          const status = T(e.status === 'skipped' ? 'Es geçildi' : 'Verildi');
           if (r.asNeeded && e.doses && e.doses.length) e.doses.forEach(d => rows.push([day, r.groupName || r.name, r.time, status, isSolo ? '' : nameOf(d.by), d.time, e.note || '']));
           else rows.push([day, r.name, r.time, status, isSolo ? '' : nameOf(e.by), e.time, e.note || '']);
         });
@@ -1381,7 +1789,7 @@
       }
       const routine = routines.find(r => r.id === routineId);
       if (routine && isTimeLocked(routine)) { showToast(`Bu doz ${routine.time.split('–')[0]} saatinde açılır`, 'HENÜZ DEĞİL'); renderRoutine(); return; }
-      const nowTime = atTime || new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+      const nowTime = atTime || new Date().toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' });
       const payload = { status, by: currentProfile, time: nowTime };
       // Taze kayıt: iki telefon aynı anda işaretlerse ikincisi birincinin kaydını fark etsin (çevrimdışıysa yerel kayıt kullanılır).
       let fresh = (logs[selectedDateKey] || {})[routineId];
@@ -1489,9 +1897,9 @@
     }
     const shareUrl = (t) => `${location.origin}${location.pathname}#g=${t}`;
     const whenText = (ts) => {
-      const d = new Date(ts); const hm = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+      const d = new Date(ts); const hm = d.toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' });
       const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      return k === dayKeyAgo(0) ? `bugün ${hm}` : (k === dayKeyAgo(1) ? `dün ${hm}` : `${d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} ${hm}`);
+      return k === dayKeyAgo(0) ? `bugün ${hm}` : (k === dayKeyAgo(1) ? `dün ${hm}` : `${d.toLocaleDateString(LOC, { day: 'numeric', month: 'long' })} ${hm}`);
     };
     window.closeShareModal = () => { const w = document.getElementById('share-modal'); if (w) w.remove(); };
     window.openShare = async () => {
@@ -1572,11 +1980,11 @@
       return `<h2 class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted mt-6 mb-1">${label}</h2><div class="bg-surface border border-line rounded-lg px-4 divide-y divide-line/70">${rows}</div>`;
     }
     function renderViewer(el, d, state) {
-      const head = `<div class="flex items-center justify-between"><span class="px-2.5 py-1 bg-ink text-white text-xs font-semibold rounded">Dozaj</span><span class="text-[11px] font-semibold text-muted border border-line rounded px-2 py-1">Yalnızca görüntüleme</span></div>`;
+      const head = `<div class="flex items-center justify-between"><span class="px-2.5 py-1 bg-ink text-white text-xs font-semibold rounded">Dozaj</span><span class="flex items-center gap-2"><button onclick="setLang(LANG==='en'?'tr':'en')" class="text-[11px] text-muted underline underline-offset-4">${LANG === 'en' ? 'Türkçe' : 'English'}</button><span class="text-[11px] font-semibold text-muted border border-line rounded px-2 py-1">Yalnızca görüntüleme</span></span></div>`;
       if (state !== 'ok' || !d || (d.exp && d.exp < Date.now())) {
         el.innerHTML = `${head}<div class="mt-8 p-5 bg-surface border border-line rounded-lg"><h1 class="text-base font-bold text-ink">Bu bağlantı geçerli değil</h1><p class="text-sm text-muted mt-2 leading-relaxed">Süresi dolmuş ya da kapatılmış olabilir. Yeni bir bağlantı için aileden birine ulaşın.</p></div>`; return;
       }
-      const dateLine = parseDateKey(dayKeyAgo(0)).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' });
+      const dateLine = parseDateKey(dayKeyAgo(0)).toLocaleDateString(LOC, { day: 'numeric', month: 'long', weekday: 'long' });
       el.innerHTML = `${head}<p class="font-mono text-[11px] font-semibold uppercase tracking-widest text-muted mt-6">BUGÜN</p><h1 class="text-xl font-bold tracking-tight text-ink mt-0.5">${dateLine}</h1>
         <p class="text-xs text-muted mt-1">Son güncelleme: ${escHtml(whenText(d.updatedAt || Date.now()))}</p>
         ${viewerDay(d, dayKeyAgo(0), 'Bugün') || '<p class="text-sm text-muted mt-4">Bugün için kayıtlı doz yok.</p>'}
@@ -1614,7 +2022,7 @@
         const sched = k < firstLog ? [] : routines.filter(r => !r.asNeeded && isActiveOn(r, k) && (!created(r) || k >= created(r)));
         let st = 'neutral';
         if (sched.length) st = sched.every(r => (logs[k] || {})[r.id]) ? 'ok' : (k === todayKey ? 'pending' : 'break');
-        days.push({ k, st, wd: d.toLocaleDateString('tr-TR', { weekday: 'short' }).slice(0, 2) });
+        days.push({ k, st, wd: d.toLocaleDateString(LOC, { weekday: 'short' }).slice(0, 2) });
       }
       let current = 0; for (const d of days) { if (d.st === 'ok') current++; else if (d.st === 'break') break; }
       let longest = 0, run = 0; for (let i = days.length - 1; i >= 0; i--) { if (days[i].st === 'ok') { run++; longest = Math.max(longest, run); } else if (days[i].st === 'break') run = 0; }
@@ -1675,7 +2083,7 @@
     }
     function buildReport(n) {
       const { keys, list, cell } = reportData(n);
-      const fmt = (k, o) => parseDateKey(k).toLocaleDateString('tr-TR', o);
+      const fmt = (k, o) => parseDateKey(k).toLocaleDateString(LOC, o);
       const range = `${fmt(keys[0], { day: 'numeric', month: 'long' })} – ${fmt(keys[keys.length - 1], { day: 'numeric', month: 'long', year: 'numeric' })}`;
       if (!list.length) return `<h1 class="text-lg font-bold">Dozaj özeti</h1><p class="text-sm text-muted mt-2">Bu dönemde kayıtlı rutin yok.</p>`;
       const th = 'border border-neutral-400 px-1.5 py-1 text-[11px] font-semibold bg-neutral-100';
@@ -2175,7 +2583,7 @@
       const isYesterday = selectedDateKey === `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
 
       document.getElementById('date-relative').textContent = isToday ? 'BUGÜN' : (isYesterday ? 'DÜN' : 'GEÇMİŞ KAYIT');
-      document.getElementById('date-title').textContent = dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' });
+      document.getElementById('date-title').textContent = dateObj.toLocaleDateString(LOC, { day: 'numeric', month: 'long', weekday: 'long' });
       document.getElementById('btn-next-day').disabled = isToday;
       document.getElementById('btn-today').classList.toggle('hidden', isToday);
 
@@ -2330,12 +2738,12 @@
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         days.push({
           key, dayNum: d.getDate(),
-          dayShort: d.toLocaleDateString('tr-TR', { weekday: 'short' }).slice(0, 2),
-          fullLabel: i === 0 ? 'Bugün' : (i === 1 ? 'Dün' : d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', weekday: 'short' }))
+          dayShort: d.toLocaleDateString(LOC, { weekday: 'short' }).slice(0, 2),
+          fullLabel: i === 0 ? 'Bugün' : (i === 1 ? 'Dün' : d.toLocaleDateString(LOC, { day: 'numeric', month: 'short', weekday: 'short' }))
         });
       }
 
-      const mFmt = (d, withYear) => d.toLocaleDateString('tr-TR', withYear ? { month: 'long', year: 'numeric' } : { month: 'long' });
+      const mFmt = (d, withYear) => d.toLocaleDateString(LOC, withYear ? { month: 'long', year: 'numeric' } : { month: 'long' });
       const newestD = parseDateKey(days[0].key), oldestD = parseDateKey(days[days.length - 1].key);
       const spans = newestD.getMonth() !== oldestD.getMonth();
       document.getElementById('history-month').textContent = 'KAYIT DEFTERİ · ' + (spans
@@ -2347,7 +2755,7 @@
       const stickyCls = 'sticky left-0 z-10 bg-surface';
       let html = `<table class="w-full text-left border-collapse"><thead><tr><th class="${stickyCls} pl-4 pr-3 text-[11px] font-semibold text-muted pb-2 whitespace-nowrap">Rutin</th>`;
       days.forEach(d => {
-        html += `<th class="text-center pb-2 px-1"><button onclick="jumpToDate('${d.key}')" class="hover:bg-paper rounded px-1 py-0.5"><span class="block font-mono text-[10px] text-muted">${d.dayShort}</span><span class="block font-mono text-[11px] font-semibold ${d.key === todayKey ? 'text-signal' : 'text-ink'}">${d.dayNum}</span>${spans && d.dayNum === 1 ? `<span class="block font-mono text-[9px] text-muted">${parseDateKey(d.key).toLocaleDateString('tr-TR', { month: 'short' })}</span>` : ''}</button></th>`;
+        html += `<th class="text-center pb-2 px-1"><button onclick="jumpToDate('${d.key}')" class="hover:bg-paper rounded px-1 py-0.5"><span class="block font-mono text-[10px] text-muted">${d.dayShort}</span><span class="block font-mono text-[11px] font-semibold ${d.key === todayKey ? 'text-signal' : 'text-ink'}">${d.dayNum}</span>${spans && d.dayNum === 1 ? `<span class="block font-mono text-[9px] text-muted">${parseDateKey(d.key).toLocaleDateString(LOC, { month: 'short' })}</span>` : ''}</button></th>`;
       });
       html += `</tr></thead><tbody class="divide-y divide-line/60">`;
       routines.filter(r => !lastDayOf(r) || days.some(d => d.key <= lastDayOf(r))).forEach(r => {
