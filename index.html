@@ -193,6 +193,7 @@
           Bağlan
         </button>
       </form>
+      <p id="join-hint" class="text-xs text-green-700 mt-2 hidden"></p>
       <p id="onb-error" class="text-xs text-red-600 hidden"></p>
       <button type="button" id="btn-takeover" onclick="takeOverSession()" class="hidden w-full py-2.5 border border-ink text-ink text-xs font-semibold rounded-md hover:bg-paper transition">Bu telefon geçsin, eski telefonu kapat</button>
     </div>
@@ -826,7 +827,15 @@
       "Her gün": "Every day",
       "Esnek pencere": "Flexible window",
       "Sabah Şurubu": "Morning Syrup",
-      "Akşam Şurubu": "Evening Syrup"
+      "Akşam Şurubu": "Evening Syrup",
+      "Rutin": "Routine",
+      "Bağlantıyı paylaş": "Share link",
+      "Bağlantıyı kopyala": "Copy link",
+      "Davet bağlantısı kopyalandı": "Invite link copied",
+      "BAĞLANTI": "LINK",
+      "Eşiniz ya da aileden biri bağlantıyı telefonunda açabilir ya da \"kodla giriş yap\" alanına bu kodu yazabilir. 1 saat geçerli ve tek kullanımlıktır.": "Your partner or a family member can open the link on their phone or type this code into the \"sign in with a code\" field. It is valid for 1 hour and can be used once.",
+      "Dozaj Takip daveti. Bağlantı 1 saat geçerli.": "Dozaj Tracker invite. The link is valid for 1 hour.",
+      "Davet bağlantısıyla geldiniz. Telefonun kimin olduğunu seçip \"Bağlan\"a basın.": "You arrived with an invite link. Choose whose phone this is and tap \"Connect\"."
 
     };
     function nm(x) { x = String(x); return x === 'Anne' ? 'Mom' : x === 'Baba' ? 'Dad' : x === 'Sen' ? 'You' : x; }
@@ -881,7 +890,7 @@
       [/^Bu aile kodunda "(.+)" oturumu başka bir telefonda açık olduğu için bu telefondaki oturum kapatıldı\.$/, function (m, w) { return 'This phone was signed out because the "' + nm(w) + '" session in this family code is open on another phone.'; }],
       [/^Bu aile kodunda "(.+?)" zaten başka bir telefonda açık; ikinci (.+?) oturumu açılamaz\. Bu telefon (.+?) ise (.+?)'(?:yı|yi|ı|i|nı|ni|u|ü) seçin\. (.+?) telefonunu değiştirdiyseniz eski telefonda "Aile kodundan çık" yapın ya da eskisine erişemiyorsanız aşağıdaki düğmeyle bu telefonu esas yapın\.$/, function (m, a, a2, o, o2, a3) { return '"' + nm(a) + '" is already open on another phone in this family code; a second ' + nm(a) + ' session cannot be opened. If this phone is ' + nm(o) + ', pick ' + nm(o) + '. If you changed ' + nm(a) + '\'s phone, choose "Leave family code" on the old phone, or if you cannot reach it, use the button below to make this phone the main one.'; }],
       [/^Kayıtlar silinmez\. Hesabınızdan \((.+)\) da çıkılır; aynı hesapla tekrar girebilirsiniz\.$/, function (m, e) { return 'Records are not deleted. You will also be signed out of your account (' + e + '); you can sign back in with the same account.'; }],
-      [/^KAYIT DEFTERİ · (.+)$/, function (m, d) { return 'RECORD LOG · ' + d; }],
+      [/^KAYIT DEFTERİ · (.+)$/, function (m, d) { return 'LOG · ' + d; }],
       [/^Dozaj özeti · (.+)$/, function (m, w) { return 'Dose summary · ' + w; }],
       [/^(.+) \((Sabah|Öğle|Akşam|Gece)\)$/, function (m, d, p) { return d + ' (' + PART[p] + ')'; }],
       [/^(.+) \((\d)\. doz\)$/, function (m, d, n) { return d + ' (dose ' + n + ')'; }],
@@ -1227,13 +1236,18 @@
       localStorage.removeItem('dozaj_family_code'); localStorage.removeItem('dozaj_mode');
       location.reload();
     }
+    // Davet bağlantısı: aynı tek kullanımlık kod, adresin #j= kısmında taşınır (sunucuya gitmez). 1 saat geçerli.
+    const inviteUrl = (c) => `${location.origin}${location.pathname}#j=${c}`;
     window.showInvite = async () => {
       showLoading('Davet kodu hazırlanıyor...');
       let c;
-      try { c = await createInvite(15); } catch (e) { console.error(e); hideLoading(); showToast('Davet kodu oluşturulamadı', 'HATA'); return; }
+      try { c = await createInvite(60); } catch (e) { console.error(e); hideLoading(); showToast('Davet kodu oluşturulamadı', 'HATA'); return; }
       hideLoading();
-      const ok = await uiDialog({ title: 'Davet kodu: ' + fmtInvite(c), text: 'Eşinizin ya da aileden birinin telefonunda "kodla giriş yap" alanına bu kodu yazın. 15 dakika geçerli ve tek kullanımlıktır.', ok: 'Kopyala', cancel: 'Kapat' });
-      if (ok) { try { await navigator.clipboard?.writeText(c); } catch (e) {} showToast('Davet kodu kopyalandı', 'KOD'); }
+      const canShare = !!navigator.share;
+      const ok = await uiDialog({ title: 'Davet kodu: ' + fmtInvite(c), text: 'Eşiniz ya da aileden biri bağlantıyı telefonunda açabilir ya da "kodla giriş yap" alanına bu kodu yazabilir. 1 saat geçerli ve tek kullanımlıktır.', ok: canShare ? 'Bağlantıyı paylaş' : 'Bağlantıyı kopyala', cancel: 'Kapat' });
+      if (!ok) return;
+      if (canShare) { try { await navigator.share({ title: 'Dozaj', text: T('Dozaj Takip daveti. Bağlantı 1 saat geçerli.'), url: inviteUrl(c) }); } catch (e) { /* iptal */ } }
+      else { try { await navigator.clipboard?.writeText(inviteUrl(c)); } catch (e) {} showToast('Davet bağlantısı kopyalandı', 'BAĞLANTI'); }
     };
     // Kayıtlı hesabın (users/{uid}) ailesini bu telefona yükler. true = yüklendi.
     async function restoreFromUserDoc(d) {
@@ -1411,6 +1425,8 @@
       if (auth.authStateReady) await auth.authStateReady();
       if (!auth.currentUser) await signInAnonymously(auth);
       const vt = viewerToken();
+      const joinHash = /^#j=(\d{8})$/.exec(location.hash);
+      if (joinHash) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
       if (vt) { startViewer(vt); return; } // görüntüleme bağlantısı: aile uygulaması hiç başlamaz
       try { await handleEmailLink(); } catch (e) { console.error(e); }
       if ('serviceWorker' in navigator) {
@@ -1427,6 +1443,7 @@
         startSyncedApp();
       } else {
         document.getElementById('screen-onboarding').classList.remove('hidden');
+        if (joinHash) { document.getElementById('inp-join-code').value = fmtInvite(joinHash[1]); const jh = document.getElementById('join-hint'); jh.textContent = 'Davet bağlantısıyla geldiniz. Telefonun kimin olduğunu seçip "Bağlan"a basın.'; jh.classList.remove('hidden'); }
         let msg = null;
         try { msg = sessionStorage.getItem('dozaj_msg'); sessionStorage.removeItem('dozaj_msg'); } catch (e) {}
         let ok = null;
