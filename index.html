@@ -289,6 +289,8 @@
       </div>
 
       <div id="late-strip"></div>
+      <div id="person-bar" class="hidden flex flex-wrap gap-2 mb-4"></div>
+      <datalist id="who-list"></datalist>
 
       <div id="routine-list" class="space-y-3"></div>
 
@@ -375,6 +377,11 @@
         <div>
           <label class="block text-xs font-semibold text-ink mb-1">Şurup / Takviye Adı</label>
           <input id="inp-name" type="text" required placeholder="Örn: D Vitamini" oninput="refreshDoseTimes()"
+            class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-ink mb-1">Kimin için <span class="font-normal text-muted">(isteğe bağlı)</span></label>
+          <input id="inp-who" type="text" maxlength="20" list="who-list" placeholder="Boş bırakılırsa herkes için" autocomplete="off"
             class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
         </div>
         <div>
@@ -475,6 +482,11 @@
         <div>
           <label class="block text-xs font-semibold text-ink mb-1">Şurup / Takviye Adı</label>
           <input id="edit-name" type="text" required class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-ink mb-1">Kimin için <span class="font-normal text-muted">(isteğe bağlı)</span></label>
+          <input id="edit-who" type="text" maxlength="20" list="who-list" placeholder="Boş bırakılırsa herkes için" autocomplete="off"
+            class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
         </div>
         <div>
           <label class="block text-xs font-semibold text-ink mb-1.5">Simge</label>
@@ -689,6 +701,24 @@
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkDayRollover(); });
     let activeTab = 'routine';
     let editMode = false;
+    // --- KİŞİ ETİKETİ (kimin için) ---
+    // Dozun isteğe bağlı r.who alanı (örn. çocuğun adı). Boşsa "Herkes": ortak vitamin gibi, her filtrede görünür.
+    let personFilter = '', reportWho = '';
+    const WHO_MAX = 20;
+    const peopleNames = () => [...new Set(routines.map(x => (x.who || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'));
+    const whoOk = (x, sel) => !sel || !x.who || x.who === sel;
+    const whoTag = (x) => (x.who && peopleNames().length >= 2) ? x.who : '';
+    function renderPersonBar() {
+      const el = document.getElementById('person-bar'); if (!el) return;
+      const names = peopleNames();
+      if (names.length < 2) { personFilter = ''; el.classList.add('hidden'); el.innerHTML = ''; return; }
+      if (personFilter && !names.includes(personFilter)) personFilter = '';
+      el.classList.remove('hidden');
+      const chip = (label, val) => { const on = personFilter === val; return `<button onclick="setPerson(this.dataset.v)" data-v="${escHtml(val)}" class="px-3 h-8 rounded-full text-xs font-semibold border transition ${on ? 'bg-ink text-white border-ink' : 'bg-surface text-ink border-line hover:border-ink'}">${escHtml(label)}</button>`; };
+      el.innerHTML = chip('Hepsi', '') + names.map(n => chip(n, n)).join('');
+    }
+    window.setPerson = (v) => { personFilter = v || ''; renderRoutine(); };
+    function whoDatalist() { const d = document.getElementById('who-list'); if (d) d.innerHTML = peopleNames().map(n => `<option value="${escHtml(n)}">`).join(''); }
     let unsubFamily = null;
     let unsubLogs = null;
 
@@ -1622,7 +1652,7 @@
       const todayKey = getTodayKey(); const base = new Date(); const keys = [];
       for (let i = n - 1; i >= 0; i--) { const d = new Date(base); d.setDate(base.getDate() - i); keys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`); }
       const created = (r) => { const m = /^r_(\d{12,})/.exec(r.id); if (!m) return null; const d = new Date(Number(m[1])); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-      const list = routines.filter(r => keys.some(k => isActiveOn(r, k) && (!created(r) || k >= created(r))));
+      const list = routines.filter(r => whoOk(r, reportWho) && keys.some(k => isActiveOn(r, k) && (!created(r) || k >= created(r))));
       const cell = (r, k) => { // null: bu gün bu ilaç için geçerli değil
         if (!isActiveOn(r, k) || (created(r) && k < created(r))) return null;
         const e = (logs[k] || {})[r.id];
@@ -1661,7 +1691,7 @@
       const noteRows = [];
       keys.forEach(k => list.forEach(r => { const e = (logs[k] || {})[r.id]; if (e && e.note) noteRows.push(`<tr><td class="${td} whitespace-nowrap">${fmt(k, { day: 'numeric', month: 'short' })}</td><td class="${td}">${escHtml(r.name)}</td><td class="${td} text-center font-mono">${escHtml(e.time || '')}</td><td class="${td}">${escHtml(e.note)}</td></tr>`); }));
       const notesSec = noteRows.length ? `<h2 class="text-xs font-bold uppercase tracking-wider mt-5">Notlar</h2><table class="w-full mt-3"><thead><tr><th class="${th} text-left">Tarih</th><th class="${th} text-left">İlaç</th><th class="${th}">Saat</th><th class="${th} text-left">Not</th></tr></thead><tbody>${noteRows.join('')}</tbody></table>` : '';
-      return `<div><h1 class="text-lg font-bold tracking-tight">Dozaj özeti</h1>
+      return `<div><h1 class="text-lg font-bold tracking-tight">Dozaj özeti${reportWho ? ' · ' + escHtml(reportWho) : ''}</h1>
         <p class="text-xs text-neutral-600 mt-0.5">${range} · son ${n} gün · <span id="report-name-print">${escHtml(document.getElementById('report-name') ? document.getElementById('report-name').value : '')}</span></p>
         <h2 class="text-xs font-bold uppercase tracking-wider mt-4">Genel</h2>${sum}
         <h2 class="text-xs font-bold uppercase tracking-wider mt-5">Gün gün</h2>${det}
@@ -1670,12 +1700,16 @@
         <p class="text-[10px] text-neutral-500 mt-3">Bu özet, uygulamadaki işaretlemelerden otomatik üretilmiştir; tıbbi değerlendirme yerine geçmez.</p></div>`;
     }
     function renderReport() {
+      const names = peopleNames(); if (reportWho && !names.includes(reportWho)) reportWho = '';
+      const sel = document.getElementById('report-who');
+      if (sel) { sel.classList.toggle('hidden', names.length < 2); sel.innerHTML = '<option value="">Herkes</option>' + names.map(n => `<option value="${escHtml(n)}"${n === reportWho ? ' selected' : ''}>${escHtml(n)}</option>`).join(''); }
       document.getElementById('report-body').innerHTML = buildReport(reportDays);
       document.querySelectorAll('#report-range button').forEach(b => { const on = Number(b.dataset.d) === reportDays; b.classList.toggle('bg-ink', on); b.classList.toggle('text-white', on); });
     }
     window.openReport = () => { document.getElementById('report-overlay').classList.remove('hidden'); document.body.style.overflow = 'hidden'; renderReport(); };
     window.closeReport = () => { document.getElementById('report-overlay').classList.add('hidden'); document.body.style.overflow = ''; };
     window.setReportDays = (n) => { reportDays = n; renderReport(); };
+    window.setReportWho = (v) => { reportWho = v || ''; renderReport(); };
 
     // --- İŞARETLENMEMİŞ DOZ ŞERİDİ ---
     // Planlanan saatin (aralıksa pencere sonunun) üstünden 1 saat geçtiyse ve kayıt yoksa, bugün için
@@ -1710,7 +1744,7 @@
       const r = findLate();
       if (!r) { el.innerHTML = ''; lateAskId = null; return; }
       const planned = r.time.split(/[–-]/)[0].trim();
-      const label = escHtml(r.groupName ? `${r.groupName} (${planned})` : `${r.name} (${planned})`);
+      const label = escHtml((whoTag(r) ? whoTag(r) + ': ' : '') + (r.groupName ? `${r.groupName} (${planned})` : `${r.name} (${planned})`));
       const btn = 'h-9 px-3 rounded-md text-xs font-semibold transition active:scale-[0.99]';
       const ask = lateAskId === r.id;
       const crit = r.priority === 'critical';
@@ -2142,7 +2176,8 @@
 
       lastLockSig = lockSig();
       lastPrnRender = Date.now();
-      const visible = routines.filter(r => isActiveOn(r, selectedDateKey) && !(r.asNeeded && isPast && !dayLogs[r.id]));
+      renderPersonBar();
+      const visible = routines.filter(r => isActiveOn(r, selectedDateKey) && whoOk(r, personFilter) && !(r.asNeeded && isPast && !dayLogs[r.id]));
       // Aynı ilacın çok dozlu kayıtları (groupId) tek kartta birleşir
       const units = []; const seenG = new Set();
       visible.forEach(r => {
@@ -2167,7 +2202,7 @@
         const shown = next || mem[mem.length - 1];
         const crit = g.priority === 'critical';
         const dots = mem.map((m, i) => ents[i] ? (ents[i].status === 'skipped' ? '<span class="inline-block w-2.5 h-2.5 rounded-full border border-muted"></span>' : '<span class="inline-block w-2.5 h-2.5 rounded-full bg-forest"></span>') : (isPast ? '<span class="inline-block w-2.5 h-2.5 rounded-full border border-signal"></span>' : '<span class="inline-block w-2.5 h-2.5 rounded-full border border-muted"></span>')).join('');
-        const meta = [g.note, (g.courseDays && g.startedOn) ? `${Math.min(dayNumberOf(g, selectedDateKey), g.courseDays)}. gün / ${g.courseDays}` : ''].filter(Boolean).join(' · ');
+        const meta = [whoTag(g), g.note, (g.courseDays && g.startedOn) ? `${Math.min(dayNumberOf(g, selectedDateKey), g.courseDays)}. gün / ${g.courseDays}` : ''].filter(Boolean).join(' · ');
         const card = document.createElement('div');
         card.className = `bg-surface rounded-lg border transition-all p-4 ${allDone ? 'border-line bg-surface/70' : (crit ? 'border-ink/25 shadow-sm' : 'border-line')}`;
         const rows = mem.map((m, i) => ents[i] ? doneLine(m, ents[i]) : (isPast ? `<div class="flex items-center justify-between text-xs"><span><span class="font-mono text-muted">${m.time}</span> <span class="font-semibold text-signal">Verilmedi</span></span></div>` : '')).filter(Boolean);
@@ -2215,7 +2250,7 @@
               </div>
               <div>
                 <h3 class="text-sm font-bold flex items-center gap-1.5 ${isDone && !r.asNeeded || isSkipped ? 'text-muted line-through decoration-muted/50' : 'text-ink'}"><span class="text-muted shrink-0">${iconSvg(iconKey(r), 'w-4 h-4')}</span><span>${r.name}</span></h3>
-                ${(() => { const meta = [r.note && r.note !== 'Esnek pencere' ? r.note : '', (r.courseDays && r.startedOn) ? `${Math.min(dayNumberOf(r, selectedDateKey), r.courseDays)}. gün / ${r.courseDays}` : ''].filter(Boolean).join(' · '); return meta ? `<p class="text-xs text-muted mt-0.5">${meta}</p>` : ''; })()}
+                ${(() => { const meta = [whoTag(r), r.note && r.note !== 'Esnek pencere' ? r.note : '', (r.courseDays && r.startedOn) ? `${Math.min(dayNumberOf(r, selectedDateKey), r.courseDays)}. gün / ${r.courseDays}` : ''].filter(Boolean).join(' · '); return meta ? `<p class="text-xs text-muted mt-0.5">${meta}</p>` : ''; })()}
               </div>
             </div>
             ${editMode ? ''
@@ -2347,6 +2382,7 @@
       document.getElementById('inp-time').required = !on;
     };
     window.openAddModal = () => {
+      whoDatalist();
       buildIconPicker('icon-picker-add', 'icon-add', null);
       document.getElementById('add-modal').classList.remove('hidden');
       document.getElementById('add-modal').classList.add('flex');
@@ -2435,6 +2471,7 @@
       const days = parseInt(document.getElementById('inp-days').value, 10);
       const minH = parseInt(document.getElementById('inp-minh').value, 10);
       const extra = { icon: pickedIcon('icon-add') || iconGuess(name) };
+      const who = document.getElementById('inp-who').value.trim().slice(0, WHO_MAX); if (who) extra.who = who;
       if (days > 0) { extra.courseDays = days; extra.startedOn = getTodayKey(); }
       const n = prn ? 1 : doseCount();
       let items;
@@ -2494,6 +2531,7 @@
       document.getElementById('edit-grp-priority').classList.toggle('hidden', !!r.asNeeded);
       document.getElementById('edit-time').required = !r.asNeeded;
       document.getElementById('edit-name').value = r.groupName || r.name;
+      whoDatalist(); document.getElementById('edit-who').value = r.who || '';
       document.getElementById('edit-time').value = r.time;
       document.getElementById('edit-note').value = r.note || '';
       document.querySelector(`input[name="edit-priority"][value="${r.priority === 'critical' ? 'critical' : 'standard'}"]`).checked = true;
@@ -2517,6 +2555,7 @@
         err.classList.remove('hidden');
         return;
       }
+      const who = document.getElementById('edit-who').value.trim().slice(0, WHO_MAX);
       const days = parseInt(document.getElementById('edit-days').value, 10);
       const minH = parseInt(document.getElementById('edit-minh').value, 10);
       const updated = sortRoutines(routines.map(x => {
@@ -2524,6 +2563,7 @@
         if (x.id !== editingId && !inGroup) return x;
         const n = { ...x, name, note, priority, allowSkip: priority !== 'critical', icon: pickedIcon('icon-edit') || iconKey(x) };
         if (x.groupId) { const old = cur.groupName || ''; n.groupName = name; n.name = (old && x.name.startsWith(old)) ? name + x.name.slice(old.length) : x.name; }
+        if (who) n.who = who; else delete n.who;
         if (x.asNeeded) { /* saat yok */ } else if (x.id === editingId) n.time = time;
         if (x.asNeeded) { if (minH > 0) n.minHours = minH; else delete n.minHours; }
         if (days > 0) { n.courseDays = days; if (!n.startedOn) n.startedOn = getTodayKey(); }
@@ -2555,6 +2595,7 @@
           <button data-d="14" onclick="setReportDays(14)" class="px-3 h-8 border-l border-line">14 gün</button>
           <button data-d="30" onclick="setReportDays(30)" class="px-3 h-8 border-l border-line">30 gün</button>
         </div>
+        <select id="report-who" onchange="setReportWho(this.value)" class="hidden h-8 px-2 text-xs border border-line rounded-md bg-white"></select>
         <input id="report-name" type="text" maxlength="40" placeholder="Ad (isteğe bağlı)" oninput="document.getElementById('report-name-print').textContent = this.value" class="h-8 px-2 text-xs border border-line rounded-md w-36" />
         <button onclick="window.print()" class="h-8 px-3 rounded-md bg-ink text-white text-xs font-semibold ml-auto">Yazdır / PDF</button>
         <button onclick="closeReport()" class="h-8 px-3 rounded-md border border-line text-xs font-semibold text-muted">Kapat</button>
