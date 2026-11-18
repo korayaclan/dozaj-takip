@@ -821,7 +821,12 @@
       "es geçildi": "skipped",
       "Bakıcı ya da aileden biri bu bağlantıyla bugünkü ve dünkü dozları": "A caregiver or family member can see today's and yesterday's doses with this link,",
       "Bağlantıya sahip olan, bugünkü ve dünkü dozları": "Anyone with the link can see today's and yesterday's doses,",
-      ". Giriş gerekmez, hiçbir şeyi değiştiremez. Süre dolunca ya da siz kapatınca çalışmaz.": "; no sign-in needed and nothing can be changed. It stops working once it expires or when you turn it off."
+      ". Giriş gerekmez, hiçbir şeyi değiştiremez. Süre dolunca ya da siz kapatınca çalışmaz.": "; no sign-in needed and nothing can be changed. It stops working once it expires or when you turn it off.",
+      "Kritik doz": "Critical dose",
+      "Her gün": "Every day",
+      "Esnek pencere": "Flexible window",
+      "Sabah Şurubu": "Morning Syrup",
+      "Akşam Şurubu": "Evening Syrup"
 
     };
     function nm(x) { x = String(x); return x === 'Anne' ? 'Mom' : x === 'Baba' ? 'Dad' : x === 'Sen' ? 'You' : x; }
@@ -889,7 +894,9 @@
       [/^\((Anne|Baba)\)$/, function (m, w) { return '(' + nm(w) + ')'; }],
       [/^(Anne|Baba|Sen) · (.+)$/, function (m, w, t) { return nm(w) + ' · ' + (t === 'giriş yapılmadı' ? 'not signed in' : t); }],
       [/^(.+) verdi$/, function (m, w) { return 'Given by ' + nm(w); }],
-      [/^(.+) es geçti$/, function (m, w) { return 'Skipped by ' + nm(w); }]
+      [/^(.+) es geçti$/, function (m, w) { return 'Skipped by ' + nm(w); }],
+      [/^(\d+)\. gün \/ (\d+)$/, function (m, a, b) { return 'Day ' + a + ' / ' + b; }],
+      [/^(.+ · .+)$/, function (m, all) { return all.split(' · ').map(inner).join(' · '); }]
 
     ];
     function tr(core) {
