@@ -381,8 +381,8 @@
         </div>
         <div>
           <label class="block text-xs font-semibold text-ink mb-1">Kimin için <span class="font-normal text-muted">(isteğe bağlı)</span></label>
-          <input id="inp-who" type="text" maxlength="20" list="who-list" placeholder="Boş bırakılırsa herkes için" autocomplete="off"
-            class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+          <div id="inp-who-box" class="space-y-2"></div>
+          <button type="button" onclick="addWhoInput('inp-who-box')" class="mt-2 text-xs font-semibold text-ink underline underline-offset-4">+ Çocuk ekle</button>
         </div>
         <div>
           <label class="block text-xs font-semibold text-ink mb-1.5">Simge</label>
@@ -485,8 +485,8 @@
         </div>
         <div>
           <label class="block text-xs font-semibold text-ink mb-1">Kimin için <span class="font-normal text-muted">(isteğe bağlı)</span></label>
-          <input id="edit-who" type="text" maxlength="20" list="who-list" placeholder="Boş bırakılırsa herkes için" autocomplete="off"
-            class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
+          <div id="edit-who-box" class="space-y-2"></div>
+          <button type="button" onclick="addWhoInput('edit-who-box')" class="mt-2 text-xs font-semibold text-ink underline underline-offset-4">+ Çocuk ekle</button>
         </div>
         <div>
           <label class="block text-xs font-semibold text-ink mb-1.5">Simge</label>
@@ -705,8 +705,19 @@
     // Dozun isteğe bağlı r.who alanı (örn. çocuğun adı). Boşsa "Herkes": ortak vitamin gibi, her filtrede görünür.
     let personFilter = '', reportWho = '';
     const WHO_MAX = 20;
-    const peopleNames = () => [...new Set(routines.map(x => (x.who || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr'));
-    const whoOk = (x, sel) => !sel || !x.who || x.who === sel;
+    const whoNames = (x) => String(x.who || '').split(',').map(t => t.trim()).filter(Boolean);
+    const peopleNames = () => [...new Set(routines.flatMap(whoNames))].sort((a, b) => a.localeCompare(b, 'tr'));
+    const whoOk = (x, sel) => !sel || !x.who || whoNames(x).includes(sel);
+    // Doz formundaki "Kimin için" alanı: her çocuk ayrı kutuda, "+ Çocuk ekle" ile çoğalır; kayıtta "Ali, Elif" olarak birleşir.
+    window.addWhoInput = (boxId, val) => {
+      const box = document.getElementById(boxId); const first = !box.children.length;
+      const row = document.createElement('div'); row.className = 'flex items-center gap-2';
+      row.innerHTML = `<input type="text" maxlength="${WHO_MAX}" list="who-list" autocomplete="off" placeholder="${first ? 'Boş bırakılırsa herkes için' : 'Diğer çocuk'}" class="who-in flex-1 px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />${first ? '' : '<button type="button" aria-label="Kaldır" class="text-muted hover:text-ink p-1" onclick="this.parentNode.remove()"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>'}`;
+      row.querySelector('input').value = val || '';
+      box.appendChild(row);
+    };
+    const setWhoInputs = (boxId, names) => { document.getElementById(boxId).innerHTML = ''; (names.length ? names : ['']).forEach(n => addWhoInput(boxId, n)); };
+    const readWho = (boxId) => [...new Set([...document.querySelectorAll(`#${boxId} .who-in`)].flatMap(i => i.value.split(',')).map(t => t.trim().slice(0, WHO_MAX)).filter(Boolean))].join(', ');
     const whoTag = (x) => (x.who && peopleNames().length >= 2) ? x.who : '';
     function renderPersonBar() {
       const el = document.getElementById('person-bar'); if (!el) return;
@@ -2382,7 +2393,7 @@
       document.getElementById('inp-time').required = !on;
     };
     window.openAddModal = () => {
-      whoDatalist();
+      whoDatalist(); setWhoInputs('inp-who-box', []);
       buildIconPicker('icon-picker-add', 'icon-add', null);
       document.getElementById('add-modal').classList.remove('hidden');
       document.getElementById('add-modal').classList.add('flex');
@@ -2471,7 +2482,7 @@
       const days = parseInt(document.getElementById('inp-days').value, 10);
       const minH = parseInt(document.getElementById('inp-minh').value, 10);
       const extra = { icon: pickedIcon('icon-add') || iconGuess(name) };
-      const who = document.getElementById('inp-who').value.trim().slice(0, WHO_MAX); if (who) extra.who = who;
+      const who = readWho('inp-who-box'); if (who) extra.who = who;
       if (days > 0) { extra.courseDays = days; extra.startedOn = getTodayKey(); }
       const n = prn ? 1 : doseCount();
       let items;
@@ -2531,7 +2542,7 @@
       document.getElementById('edit-grp-priority').classList.toggle('hidden', !!r.asNeeded);
       document.getElementById('edit-time').required = !r.asNeeded;
       document.getElementById('edit-name').value = r.groupName || r.name;
-      whoDatalist(); document.getElementById('edit-who').value = r.who || '';
+      whoDatalist(); setWhoInputs('edit-who-box', whoNames(r));
       document.getElementById('edit-time').value = r.time;
       document.getElementById('edit-note').value = r.note || '';
       document.querySelector(`input[name="edit-priority"][value="${r.priority === 'critical' ? 'critical' : 'standard'}"]`).checked = true;
@@ -2555,7 +2566,7 @@
         err.classList.remove('hidden');
         return;
       }
-      const who = document.getElementById('edit-who').value.trim().slice(0, WHO_MAX);
+      const who = readWho('edit-who-box');
       const days = parseInt(document.getElementById('edit-days').value, 10);
       const minH = parseInt(document.getElementById('edit-minh').value, 10);
       const updated = sortRoutines(routines.map(x => {
