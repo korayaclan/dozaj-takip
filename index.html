@@ -705,7 +705,7 @@
     // Dozun isteğe bağlı r.who alanı (örn. çocuğun adı). Boşsa "Herkes": ortak vitamin gibi, her filtrede görünür.
     let personFilter = '', reportWho = '';
     const WHO_MAX = 20;
-    const whoNames = (x) => String(x.who || '').split(',').map(t => t.trim()).filter(Boolean);
+    const whoNames = (x) => String(x.who || '').split(',').map(t => t.trim()).filter(Boolean).sort((a, b) => a.localeCompare(b, 'tr'));
     const peopleNames = () => [...new Set(routines.flatMap(whoNames))].sort((a, b) => a.localeCompare(b, 'tr'));
     const whoOk = (x, sel) => !sel || !x.who || whoNames(x).includes(sel);
     // Doz formundaki "Kimin için" alanı: her çocuk ayrı kutuda, "+ Çocuk ekle" ile çoğalır; kayıtta "Ali, Elif" olarak birleşir.
@@ -717,8 +717,8 @@
       box.appendChild(row);
     };
     const setWhoInputs = (boxId, names) => { document.getElementById(boxId).innerHTML = ''; (names.length ? names : ['']).forEach(n => addWhoInput(boxId, n)); };
-    const readWho = (boxId) => [...new Set([...document.querySelectorAll(`#${boxId} .who-in`)].flatMap(i => i.value.split(',')).map(t => t.trim().slice(0, WHO_MAX)).filter(Boolean))].join(', ');
-    const whoTag = (x) => (x.who && peopleNames().length >= 2) ? x.who : '';
+    const readWho = (boxId) => [...new Set([...document.querySelectorAll(`#${boxId} .who-in`)].flatMap(i => i.value.split(',')).map(t => t.trim().slice(0, WHO_MAX)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'tr')).join(', ');
+    const whoTag = (x) => (x.who && peopleNames().length >= 2) ? whoNames(x).join(', ') : '';
     function renderPersonBar() {
       const el = document.getElementById('person-bar'); if (!el) return;
       const names = peopleNames();
