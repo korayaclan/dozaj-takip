@@ -838,7 +838,8 @@
       "Davet bağlantısıyla geldiniz. Telefonun kimin olduğunu seçip \"Bağlan\"a basın.": "You arrived with an invite link. Choose whose phone this is and tap \"Connect\".",
       "Teşekkür et": "Say thanks",
       "Teşekkür ettin": "You said thanks",
-      "Gönderilemedi, tekrar dene": "Could not send, try again"
+      "Gönderilemedi, tekrar dene": "Could not send, try again",
+      "TEŞEKKÜR": "THANKS"
 
     };
     function nm(x) { x = String(x); return x === 'Anne' ? 'Mom' : x === 'Baba' ? 'Dad' : x === 'Sen' ? 'You' : x; }
@@ -1806,7 +1807,7 @@
         const key = `${selectedDateKey}|${id}|${t.ts || 0}`;
         const fresh = !mine && gaveDose(e) && !thxSeen().includes(key);
         const label = mine ? 'Teşekkür ettin' : `${nameOf(t.by)} teşekkür ediyor`;
-        return `<span data-thx="${id}"${fresh ? ` data-fresh="${escHtml(key)}"` : ''} class="text-red-500 shrink-0 inline-flex" title="${escHtml(label)}" aria-label="${escHtml(label)}"><svg class="w-[18px] h-[18px]" fill="currentColor" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="${HEART}"/></svg></span>`;
+        return `<button onclick="thanksTap(this)" data-thx="${id}" data-msg="${escHtml(label)}"${fresh ? ` data-fresh="${escHtml(key)}"` : ''} class="text-red-500 p-0.5 -m-0.5 shrink-0 inline-flex active:scale-110 transition-transform" title="${escHtml(label)}" aria-label="${escHtml(label)}"><svg class="w-[18px] h-[18px]" fill="currentColor" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="${HEART}"/></svg></button>`;
       }
       if (selectedDateKey < getTodayKey() || editMode || gaveDose(e)) return '';
       return `<button onclick="thankFor('${id}', this)" class="text-muted hover:text-red-500 p-0.5 -m-0.5 shrink-0 transition-colors" title="Teşekkür et" aria-label="Teşekkür et"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="${HEART}"/></svg></button>`;
@@ -1842,6 +1843,11 @@
       });
       try { localStorage.setItem('dozaj_thx', JSON.stringify(seen.slice(-60))); } catch (_) {}
     }
+    // Teşekkür kalbine tekrar dokununca konfeti yeniden patlar ve kim teşekkür ettiği yazılır.
+    window.thanksTap = (btn) => {
+      const b = btn.getBoundingClientRect(); heartBurst(b.left + b.width / 2, b.top + b.height / 2, 26);
+      showToast(btn.dataset.msg || '', 'TEŞEKKÜR');
+    };
     window.thankFor = async (id, btn) => {
       const e = (logs[selectedDateKey] || {})[id];
       if (!e || e.status !== 'done' || gaveDose(e) || e.thanks) return;
