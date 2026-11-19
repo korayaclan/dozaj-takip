@@ -835,7 +835,10 @@
       "BAĞLANTI": "LINK",
       "Eşiniz ya da aileden biri bağlantıyı telefonunda açabilir ya da \"kodla giriş yap\" alanına bu kodu yazabilir. 1 saat geçerli ve tek kullanımlıktır.": "Your partner or a family member can open the link on their phone or type this code into the \"sign in with a code\" field. It is valid for 1 hour and can be used once.",
       "Dozaj Takip daveti. Bağlantı 1 saat geçerli.": "Dozaj Tracker invite. The link is valid for 1 hour.",
-      "Davet bağlantısıyla geldiniz. Telefonun kimin olduğunu seçip \"Bağlan\"a basın.": "You arrived with an invite link. Choose whose phone this is and tap \"Connect\"."
+      "Davet bağlantısıyla geldiniz. Telefonun kimin olduğunu seçip \"Bağlan\"a basın.": "You arrived with an invite link. Choose whose phone this is and tap \"Connect\".",
+      "Teşekkür et": "Say thanks",
+      "Teşekkür ettin": "You said thanks",
+      "Gönderilemedi, tekrar dene": "Could not send, try again"
 
     };
     function nm(x) { x = String(x); return x === 'Anne' ? 'Mom' : x === 'Baba' ? 'Dad' : x === 'Sen' ? 'You' : x; }
@@ -897,6 +900,7 @@
       [/^(\d)\. doz saati$/, function (m, n) { return 'Dose ' + n + ' time'; }],
       [/^✓ (.+) verdi · (.+)$/, function (m, w, t) { return '✓ Given by ' + nm(w) + ' · ' + t; }],
       [/^✓ Verildi · (.+)$/, function (m, t) { return '✓ Given · ' + t; }],
+      [/^(.+) teşekkür ediyor$/, function (m, w) { return nm(w) + ' says thank you'; }],
       [/^(.+) tarafından verildi$/, function (m, w) { return 'Given by ' + nm(w); }],
       [/^(.+) tarafından es geçildi$/, function (m, w) { return 'Skipped by ' + nm(w); }],
       [/^Es geçildi \((.+)\)$/, function (m, w) { return 'Skipped (' + nm(w) + ')'; }],
@@ -1789,6 +1793,60 @@
     function noteBtn(routineId, hasNote) {
       return `<button onclick="editNote('${routineId}')" class="text-muted hover:text-ink p-0.5 -m-0.5 shrink-0" title="${hasNote ? 'Notu düzenle' : 'Not ekle'}" aria-label="${hasNote ? 'Notu düzenle' : 'Not ekle'}"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="${PENCIL}"/></svg></button>`;
     }
+    // --- Teşekkür kalbi: ilacı vermeyen kişi, veren kişiye ♥ gönderir ---
+    function gaveDose(e) { return !!e && (e.doses && e.doses.length ? e.doses.some(d => d.by === currentProfile) : e.by === currentProfile); }
+    function thxSeen() { try { return JSON.parse(localStorage.getItem('dozaj_thx') || '[]'); } catch (_) { return []; } }
+    function thanksHtml(id, e) {
+      if (isSolo || !e || e.status !== 'done') return '';
+      const t = e.thanks;
+      if (t && t.by) {
+        const mine = t.by === currentProfile;
+        const key = `${selectedDateKey}|${id}|${t.ts || 0}`;
+        const fresh = !mine && gaveDose(e) && !thxSeen().includes(key);
+        return `<div class="mt-1.5 text-[11px] font-semibold text-signal flex items-center gap-1" data-thx="${id}"${fresh ? ` data-fresh="${escHtml(key)}"` : ''}><span class="thx-heart">♥</span>${mine ? 'Teşekkür ettin' : `${escHtml(nameOf(t.by))} teşekkür ediyor`}</div>`;
+      }
+      if (selectedDateKey < getTodayKey() || editMode || gaveDose(e)) return '';
+      return `<div class="mt-1.5"><button onclick="thankFor('${id}', this)" class="text-[11px] font-semibold text-signal hover:underline underline-offset-2 inline-flex items-center gap-1"><span class="thx-heart">♥</span>Teşekkür et</button></div>`;
+    }
+    function heartBurst(x, y, n) {
+      if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const cols = ['#e11d48', '#f43f5e', '#fb7185', '#f59e0b', '#fbbf24', '#ec4899'];
+      for (let i = 0; i < n; i++) {
+        const el = document.createElement('span');
+        const heart = i % 3 !== 2;
+        el.textContent = heart ? '♥' : '';
+        el.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:200;pointer-events:none;color:${cols[i % cols.length]};font-size:${10 + Math.random() * 12}px;line-height:1;` + (heart ? '' : `width:6px;height:9px;background:${cols[i % cols.length]};border-radius:1px;`);
+        document.body.appendChild(el);
+        const ang = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, dist = 60 + Math.random() * 120;
+        const dx = Math.cos(ang) * dist, dy = Math.sin(ang) * dist;
+        const a = el.animate([
+          { transform: 'translate(-50%,-50%) scale(.4) rotate(0deg)', opacity: 1 },
+          { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy - 20}px)) scale(1) rotate(${(Math.random() - 0.5) * 120}deg)`, opacity: 1, offset: 0.55 },
+          { transform: `translate(calc(-50% + ${dx * 1.15}px), calc(-50% + ${dy + 90}px)) scale(.9) rotate(${(Math.random() - 0.5) * 240}deg)`, opacity: 0 }
+        ], { duration: 1500 + Math.random() * 700, easing: 'cubic-bezier(.2,.7,.3,1)', delay: Math.random() * 120 });
+        a.onfinish = () => el.remove();
+      }
+    }
+    function celebrateThanks() {
+      const els = document.querySelectorAll('[data-thx][data-fresh]');
+      if (!els.length) return;
+      const seen = thxSeen();
+      els.forEach(el => {
+        seen.push(el.dataset.fresh); el.removeAttribute('data-fresh');
+        const b = el.getBoundingClientRect();
+        if (b.bottom < 0 || b.top > innerHeight) return;
+        heartBurst(b.left + 30, b.top + b.height / 2, 26);
+      });
+      try { localStorage.setItem('dozaj_thx', JSON.stringify(seen.slice(-60))); } catch (_) {}
+    }
+    window.thankFor = async (id, btn) => {
+      const e = (logs[selectedDateKey] || {})[id];
+      if (!e || e.status !== 'done' || gaveDose(e) || e.thanks) return;
+      if (btn) { const b = btn.getBoundingClientRect(); heartBurst(b.left + 20, b.top, 12); btn.disabled = true; }
+      try {
+        await updateDoc(doc(db, 'families', familyCode, 'logs', selectedDateKey), { [`${id}.thanks`]: { by: currentProfile, ts: Date.now() } });
+      } catch (err) { showToast('Gönderilemedi, tekrar dene', 'HATA'); if (btn) btn.disabled = false; }
+    };
     function noteHtml(routineId, entry) {
       if (!entry || !entry.note) return '';
       return `<span class="text-[11px] italic text-ink/70">“${escHtml(entry.note)}”</span>`;
@@ -2639,7 +2697,7 @@
         const undo = (!isPast && !editMode && e.by === currentProfile) ? `<button onclick="undoAction('${m.id}')" class="text-[11px] font-medium text-muted hover:text-ink underline underline-offset-2">Geri al</button>` : '';
         const who = skipped ? (isSolo ? 'es geçildi' : `${escHtml(nameOf(e.by))} es geçti`) : (isSolo ? 'verildi' : `${escHtml(nameOf(e.by))} verdi`);
         const mark = skipped ? '<span class="text-muted">–</span>' : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>';
-        return `<div><div class="flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold ${skipped ? 'text-muted' : 'text-forest'}">${mark}<span class="font-mono">${m.time}</span> ${who}</span><span class="flex items-center gap-3"><span class="font-mono text-muted">${e.time}</span>${undo}${(!isPast && !editMode) ? noteBtn(m.id, !!e.note) : ''}</span></div>${e.note ? `<div class="mt-1 ml-5">${noteHtml(m.id, e)}</div>` : ''}</div>`;
+        return `<div><div class="flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold ${skipped ? 'text-muted' : 'text-forest'}">${mark}<span class="font-mono">${m.time}</span> ${who}</span><span class="flex items-center gap-3"><span class="font-mono text-muted">${e.time}</span>${undo}${(!isPast && !editMode) ? noteBtn(m.id, !!e.note) : ''}</span></div>${e.note ? `<div class="mt-1 ml-5">${noteHtml(m.id, e)}</div>` : ''}${thanksHtml(m.id, e) ? `<div class="ml-5">${thanksHtml(m.id, e)}</div>` : ''}</div>`;
       };
       const renderGroupCard = (unit) => {
         const mem = unit.slice().sort((a, b) => startMinutes(a.time) - startMinutes(b.time));
@@ -2714,12 +2772,13 @@
             : (last ? `Son doz: ${agoText(last.ts)}${r.minHours ? ` · en az ${r.minHours} sa ara` : ''}` : (r.minHours ? `En az ${r.minHours} sa arayla` : 'Henüz verilmedi'));
           const btn = (!isPast && !editMode) ? `<button onclick="recordAction('${r.id}', 'done')" class="mt-2.5 w-full h-9 rounded-md bg-ink text-white text-xs font-semibold hover:bg-neutral-800 active:scale-[0.99] transition">${doses.length ? 'Bir doz daha' : 'Verdim'}</button>` : '';
           const prnNote = entry && entry.note ? `<div class="mt-1.5">${noteHtml(r.id, entry)}</div>` : '';
-          actionHtml = `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs text-muted">${info}${doses.length && !isSolo ? ` <span>(${escHtml(nameOf(entry.by))})</span>` : ''}${prnNote}${btn}</div>`;
+          actionHtml = `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs text-muted">${info}${doses.length && !isSolo ? ` <span>(${escHtml(nameOf(entry.by))})</span>` : ''}${prnNote}${thanksHtml(r.id, entry)}${btn}</div>`;
         } else if (entry) {
           actionHtml = isDone
             ? `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold text-forest"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>${isSolo ? 'Verildi' : `${escHtml(nameOf(entry.by))} tarafından verildi`}</span><span class="font-mono text-muted font-medium">${entry.time}</span></div>`
             : `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs text-muted"><span>${isSolo ? 'Es geçildi' : `${escHtml(nameOf(entry.by))} tarafından es geçildi`}</span><span class="font-mono">${entry.time}</span></div>`;
           if (entry.note) actionHtml += `<div class="mt-1.5">${noteHtml(r.id, entry)}</div>`;
+          if (isDone) actionHtml += thanksHtml(r.id, entry);
         } else if (isPast) {
           actionHtml = `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs font-semibold text-signal">Verilmedi</div>`;
         } else if (!editMode) {
@@ -2756,6 +2815,7 @@
       document.getElementById('progress-label').textContent = `${completedCount}/${countable}`;
       document.getElementById('progress-fill').style.width = countable > 0 ? `${(completedCount / countable) * 100}%` : '0%';
       renderLateStrip(); updateStreakChip();
+      celebrateThanks();
     }
 
     function renderHistory() {
