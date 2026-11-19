@@ -1796,17 +1796,20 @@
     // --- Teşekkür kalbi: ilacı vermeyen kişi, veren kişiye ♥ gönderir ---
     function gaveDose(e) { return !!e && (e.doses && e.doses.length ? e.doses.some(d => d.by === currentProfile) : e.by === currentProfile); }
     function thxSeen() { try { return JSON.parse(localStorage.getItem('dozaj_thx') || '[]'); } catch (_) { return []; } }
-    function thanksHtml(id, e) {
+    const HEART = 'M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z';
+    // Kalem simgesinin yanındaki kalp: teşekkür edilmeden silik çizgi, edilince kırmızı dolu.
+    function heartBtn(id, e) {
       if (isSolo || !e || e.status !== 'done') return '';
       const t = e.thanks;
       if (t && t.by) {
         const mine = t.by === currentProfile;
         const key = `${selectedDateKey}|${id}|${t.ts || 0}`;
         const fresh = !mine && gaveDose(e) && !thxSeen().includes(key);
-        return `<div class="mt-1.5 text-[11px] font-semibold text-signal flex items-center gap-1" data-thx="${id}"${fresh ? ` data-fresh="${escHtml(key)}"` : ''}><span class="thx-heart">♥</span>${mine ? 'Teşekkür ettin' : `${escHtml(nameOf(t.by))} teşekkür ediyor`}</div>`;
+        const label = mine ? 'Teşekkür ettin' : `${nameOf(t.by)} teşekkür ediyor`;
+        return `<span data-thx="${id}"${fresh ? ` data-fresh="${escHtml(key)}"` : ''} class="text-red-500 shrink-0 inline-flex" title="${escHtml(label)}" aria-label="${escHtml(label)}"><svg class="w-[18px] h-[18px]" fill="currentColor" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="${HEART}"/></svg></span>`;
       }
       if (selectedDateKey < getTodayKey() || editMode || gaveDose(e)) return '';
-      return `<div class="mt-1.5"><button onclick="thankFor('${id}', this)" class="text-[11px] font-semibold text-signal hover:underline underline-offset-2 inline-flex items-center gap-1"><span class="thx-heart">♥</span>Teşekkür et</button></div>`;
+      return `<button onclick="thankFor('${id}', this)" class="text-muted hover:text-red-500 p-0.5 -m-0.5 shrink-0 transition-colors" title="Teşekkür et" aria-label="Teşekkür et"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="${HEART}"/></svg></button>`;
     }
     function heartBurst(x, y, n) {
       if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -2697,7 +2700,7 @@
         const undo = (!isPast && !editMode && e.by === currentProfile) ? `<button onclick="undoAction('${m.id}')" class="text-[11px] font-medium text-muted hover:text-ink underline underline-offset-2">Geri al</button>` : '';
         const who = skipped ? (isSolo ? 'es geçildi' : `${escHtml(nameOf(e.by))} es geçti`) : (isSolo ? 'verildi' : `${escHtml(nameOf(e.by))} verdi`);
         const mark = skipped ? '<span class="text-muted">–</span>' : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>';
-        return `<div><div class="flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold ${skipped ? 'text-muted' : 'text-forest'}">${mark}<span class="font-mono">${m.time}</span> ${who}</span><span class="flex items-center gap-3"><span class="font-mono text-muted">${e.time}</span>${undo}${(!isPast && !editMode) ? noteBtn(m.id, !!e.note) : ''}</span></div>${e.note ? `<div class="mt-1 ml-5">${noteHtml(m.id, e)}</div>` : ''}${thanksHtml(m.id, e) ? `<div class="ml-5">${thanksHtml(m.id, e)}</div>` : ''}</div>`;
+        return `<div><div class="flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold ${skipped ? 'text-muted' : 'text-forest'}">${mark}<span class="font-mono">${m.time}</span> ${who}</span><span class="flex items-center gap-3"><span class="font-mono text-muted">${e.time}</span>${undo}${heartBtn(m.id, e)}${(!isPast && !editMode) ? noteBtn(m.id, !!e.note) : ''}</span></div>${e.note ? `<div class="mt-1 ml-5">${noteHtml(m.id, e)}</div>` : ''}</div>`;
       };
       const renderGroupCard = (unit) => {
         const mem = unit.slice().sort((a, b) => startMinutes(a.time) - startMinutes(b.time));
@@ -2760,7 +2763,7 @@
               </div>
             </div>
             ${editMode ? ''
-              : `<span class="flex items-center gap-3 shrink-0">${!isPast && entry && entry.by === currentProfile ? `<button onclick="undoAction('${r.id}')" class="text-[11px] font-medium text-muted hover:text-ink underline underline-offset-2">Geri al</button>` : ''}${!isPast && entry ? noteBtn(r.id, !!entry.note) : ''}</span>`}
+              : `<span class="flex items-center gap-3 shrink-0">${!isPast && entry && entry.by === currentProfile ? `<button onclick="undoAction('${r.id}')" class="text-[11px] font-medium text-muted hover:text-ink underline underline-offset-2">Geri al</button>` : ''}${heartBtn(r.id, entry)}${!isPast && entry ? noteBtn(r.id, !!entry.note) : ''}</span>`}
           </div>`;
 
         let actionHtml = '';
@@ -2772,13 +2775,12 @@
             : (last ? `Son doz: ${agoText(last.ts)}${r.minHours ? ` · en az ${r.minHours} sa ara` : ''}` : (r.minHours ? `En az ${r.minHours} sa arayla` : 'Henüz verilmedi'));
           const btn = (!isPast && !editMode) ? `<button onclick="recordAction('${r.id}', 'done')" class="mt-2.5 w-full h-9 rounded-md bg-ink text-white text-xs font-semibold hover:bg-neutral-800 active:scale-[0.99] transition">${doses.length ? 'Bir doz daha' : 'Verdim'}</button>` : '';
           const prnNote = entry && entry.note ? `<div class="mt-1.5">${noteHtml(r.id, entry)}</div>` : '';
-          actionHtml = `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs text-muted">${info}${doses.length && !isSolo ? ` <span>(${escHtml(nameOf(entry.by))})</span>` : ''}${prnNote}${thanksHtml(r.id, entry)}${btn}</div>`;
+          actionHtml = `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs text-muted">${info}${doses.length && !isSolo ? ` <span>(${escHtml(nameOf(entry.by))})</span>` : ''}${prnNote}${btn}</div>`;
         } else if (entry) {
           actionHtml = isDone
             ? `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold text-forest"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>${isSolo ? 'Verildi' : `${escHtml(nameOf(entry.by))} tarafından verildi`}</span><span class="font-mono text-muted font-medium">${entry.time}</span></div>`
             : `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs text-muted"><span>${isSolo ? 'Es geçildi' : `${escHtml(nameOf(entry.by))} tarafından es geçildi`}</span><span class="font-mono">${entry.time}</span></div>`;
           if (entry.note) actionHtml += `<div class="mt-1.5">${noteHtml(r.id, entry)}</div>`;
-          if (isDone) actionHtml += thanksHtml(r.id, entry);
         } else if (isPast) {
           actionHtml = `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs font-semibold text-signal">Verilmedi</div>`;
         } else if (!editMode) {
