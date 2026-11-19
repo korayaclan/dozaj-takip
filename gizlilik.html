@@ -19,9 +19,11 @@
 </head>
 <body>
 <main>
+  <p style="text-align:right;margin:0"><a href="#" id="sw" style="font-size:13px"></a></p>
+<div id="tr" lang="tr">
   <p class="tag">DOZAJ TAKİP</p>
   <h1>Gizlilik</h1>
-  <p>Son güncelleme: 15 Kasım 2026</p>
+  <p>Son güncelleme: 19 Kasım 2026</p>
 
   <div class="box"><p style="margin:0">Kısaca: yalnızca uygulamanın çalışması için gereken veriyi saklarız, reklam ya da izleme yoktur, veriniz satılmaz ve kimseyle paylaşılmaz.</p></div>
 
@@ -37,7 +39,7 @@
   <p>Veriler Google'ın Firebase hizmetinde (Firestore, Authentication, Cloud Messaging) saklanır. Uygulama ayrıca yazı tipleri ve tasarım kütüphanesi için Google Fonts ve Tailwind CDN'den dosya yükler; bu sağlayıcılar sayfayı açtığınızda IP adresinizi görebilir.</p>
 
   <h2>Kimler görebilir?</h2>
-  <p>Kayıtları yalnızca aileye üye olan hesaplar görür. Birini eklemek için uygulamadaki "Davet" düğmesiyle 15 dakika geçerli, tek kullanımlık bir kod üretirsiniz; kodu yalnızca güvendiğiniz kişiyle paylaşın. Uygulama geliştiricisi gerektiğinde bakım amacıyla veritabanına erişebilir; verilerinizi kendi amacı için kullanmaz.</p>
+  <p>Kayıtları yalnızca aileye üye olan hesaplar görür. Birini eklemek için uygulamadaki "Davet" düğmesiyle 1 saat geçerli, tek kullanımlık bir kod üretirsiniz; kodu yalnızca güvendiğiniz kişiyle paylaşın. Uygulama geliştiricisi gerektiğinde bakım amacıyla veritabanına erişebilir; verilerinizi kendi amacı için kullanmaz.</p>
   <p>İsterseniz "Görüntüleme bağlantısı" ile (örneğin bakıcı için) 1, 7 ya da 30 gün geçerli, yalnızca okunur bir bağlantı oluşturabilirsiniz. Bağlantıyı açan kişi giriş yapmadan yalnızca bugünün ve dünün doz kayıtlarını (ilaç adları, saatler, notlar ve kimin verdiği) görür; hiçbir şeyi değiştiremez. Bu amaçla verilerin bu iki günlük arınmış bir kopyası ayrıca saklanır; bağlantıyı kapattığınızda ya da süresi dolduğunda erişim biter ve kopya silinir. Bağlantıyı yalnızca güvendiğiniz kişilerle paylaşın.</p>
 
   <h2>Verilerimi nasıl silerim?</h2>
@@ -50,6 +52,53 @@
   <p><a href="https://github.com/korayaclan/dozaj-takip/issues">GitHub üzerinden</a> ulaşabilirsiniz.</p>
 
   <p style="margin-top:32px"><a href="./">← Uygulamaya dön</a></p>
+</div>
+<div id="en" lang="en" hidden>
+  <p class="tag">DOZAJ TRACKER</p>
+  <h1>Privacy</h1>
+  <p>Last updated: 19 November 2026</p>
+
+  <div class="box"><p style="margin:0">In short: we only store the data the app needs to work. There are no ads and no tracking, and your data is never sold or shared.</p></div>
+
+  <h2>What data is stored?</h2>
+  <ul>
+    <li>The medicines and routines you add (name, time, note) and records of which dose was given and when.</li>
+    <li>Your family's random ID, the anonymous IDs of member accounts and the profile you choose (Mom / Dad / You).</li>
+    <li>Your email address if you sign in (with Google or an email link). If you do not sign in, only a random anonymous ID is created.</li>
+    <li>Your device's notification key, if you turn on notifications.</li>
+  </ul>
+
+  <h2>Where is the data kept?</h2>
+  <p>Data is stored in Google's Firebase services (Firestore, Authentication, Cloud Messaging). The app also loads files for fonts and its design library from Google Fonts and the Tailwind CDN; these providers can see your IP address when you open the page.</p>
+
+  <h2>Who can see it?</h2>
+  <p>Only accounts that are members of the family can see the records. To add someone, you create a single-use code, valid for 1 hour, with the "Invite" button in the app; share the code only with someone you trust. The app's developer may access the database for maintenance when necessary and does not use your data for their own purposes.</p>
+  <p>If you like, you can create a read-only link with "Viewing link" (for a babysitter, for example), valid for 1, 7 or 30 days. Anyone who opens the link sees only today's and yesterday's dose records (medicine names, times, notes and who gave them) without signing in, and cannot change anything. For this purpose a sanitized copy of those two days of data is stored separately; when you turn the link off or it expires, access ends and the copy is deleted. Share the link only with people you trust.</p>
+
+  <h2>How do I delete my data?</h2>
+  <p>In Settings you can sign out of your account, and with "Download records (CSV)" you can get a copy of your records. If you want your data deleted completely, write to us through the contact channel below.</p>
+
+  <h2>Medical notice</h2>
+  <p>This app is a reminder and record-keeping tool; it does not give medical advice. Follow your doctor's instructions and the medicine's leaflet for doses.</p>
+
+  <h2>Contact</h2>
+  <p>You can reach us <a href="https://github.com/korayaclan/dozaj-takip/issues">on GitHub</a>.</p>
+
+  <p style="margin-top:32px"><a href="./">← Back to the app</a></p>
+</div>
 </main>
+<script>
+  (function () {
+    var q = (location.search.match(/[?&]lang=(tr|en)/) || [])[1], st = '';
+    try { st = localStorage.getItem('dozaj_lang') || ''; } catch (e) {}
+    var lang = q || (st === 'en' ? 'en' : 'tr');
+    function show(l) {
+      document.getElementById('tr').hidden = l !== 'tr'; document.getElementById('en').hidden = l !== 'en';
+      document.documentElement.lang = l; document.title = l === 'en' ? 'Privacy – Dozaj Tracker' : 'Gizlilik – Dozaj Takip';
+      var sw = document.getElementById('sw'); sw.textContent = l === 'en' ? 'Türkçe' : 'English'; sw.onclick = function (e) { e.preventDefault(); show(l === 'en' ? 'tr' : 'en'); };
+    }
+    show(lang);
+  })();
+</script>
 </body>
 </html>
