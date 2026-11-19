@@ -310,7 +310,7 @@
       <div id="email-footer" class="mt-4 p-3 border border-line rounded-md bg-surface text-xs text-muted leading-relaxed">
         <div id="email-linked" class="hidden"><div class="flex items-center gap-2">
           <svg class="h-4 w-4 text-green-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>
-          <span>Hesap bağlı: <span id="email-linked-addr" class="font-semibold text-ink"></span></span>
+          <span>Hesap bağlı: <button type="button" id="email-linked-addr" onclick="toggleEmailShow()" class="font-semibold text-ink underline decoration-dotted underline-offset-4 break-all text-left" title="Göstermek için dokun" aria-label="E-posta adresini göster"></button></span>
         </div></div>
         <div id="email-add" class="space-y-2.5">
           <p class="font-semibold text-ink">Hesabını bağla</p>
@@ -848,7 +848,9 @@
       "Teşekkürü geri al": "Take back thanks",
       "Teşekkür geri alındı": "Thanks taken back",
       "GERİ ALINDI": "UNDONE",
-      "Geri alınamadı, tekrar dene": "Could not undo, try again"
+      "Geri alınamadı, tekrar dene": "Could not undo, try again",
+      "Göstermek için dokun": "Tap to show",
+      "E-posta adresini göster": "Show email address"
 
     };
     function nm(x) { x = String(x); return x === 'Anne' ? 'Mom' : x === 'Baba' ? 'Dad' : x === 'Sen' ? 'You' : x; }
@@ -1139,6 +1141,18 @@
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkDayRollover(); });
     let activeTab = 'routine';
     let editMode = false;
+    // Ekran kaydında e-posta görünmesin: varsayılan gizli, dokununca 8 saniyeliğine açılır.
+    let emailFull = '', emailShown = false, emailTimer = null;
+    function maskEmail(e) {
+      const [l, d = ''] = String(e).split('@'); const dot = d.lastIndexOf('.');
+      const m = (x) => x ? x[0] + '•'.repeat(Math.min(Math.max(x.length - 1, 2), 5)) : '';
+      return m(l) + '@' + (dot > 0 ? m(d.slice(0, dot)) + d.slice(dot) : m(d));
+    }
+    function paintEmail() { const el = document.getElementById('email-linked-addr'); if (el) el.textContent = emailShown ? emailFull : maskEmail(emailFull); }
+    window.toggleEmailShow = () => {
+      emailShown = !emailShown; paintEmail(); clearTimeout(emailTimer);
+      if (emailShown) emailTimer = setTimeout(() => { emailShown = false; paintEmail(); }, 8000);
+    };
     // --- KİŞİ ETİKETİ (kimin için) ---
     // Dozun isteğe bağlı r.who alanı (örn. çocuğun adı). Boşsa "Herkes": ortak vitamin gibi, her filtrede görünür.
     let personFilter = '', reportWho = '';
@@ -1199,7 +1213,7 @@
       const linked = isLinked();
       document.getElementById('email-linked').classList.toggle('hidden', !linked);
       document.getElementById('email-add').classList.toggle('hidden', linked);
-      if (linked) document.getElementById('email-linked-addr').textContent = auth.currentUser.email;
+      if (linked) { emailFull = auth.currentUser.email || ''; emailShown = false; paintEmail(); }
       const sh = document.getElementById('solo-hint');
       if (sh) sh.textContent = linked ? 'Telefonu değiştirirseniz yeni telefonda aynı hesapla giriş yapmanız yeterli.' : 'Telefonu değiştirirseniz kayıtlarınıza dönebilmek için aşağıdan Google ile hesabınızı bağlayın.';
     }
