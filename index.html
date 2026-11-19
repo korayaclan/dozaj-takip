@@ -839,7 +839,11 @@
       "Teşekkür et": "Say thanks",
       "Teşekkür ettin": "You said thanks",
       "Gönderilemedi, tekrar dene": "Could not send, try again",
-      "TEŞEKKÜR": "THANKS"
+      "TEŞEKKÜR": "THANKS",
+      "Teşekkürü geri al": "Take back thanks",
+      "Teşekkür geri alındı": "Thanks taken back",
+      "GERİ ALINDI": "UNDONE",
+      "Geri alınamadı, tekrar dene": "Could not undo, try again"
 
     };
     function nm(x) { x = String(x); return x === 'Anne' ? 'Mom' : x === 'Baba' ? 'Dad' : x === 'Sen' ? 'You' : x; }
@@ -1806,7 +1810,8 @@
         const mine = t.by === currentProfile;
         const key = `${selectedDateKey}|${id}|${t.ts || 0}`;
         const fresh = !mine && gaveDose(e) && !thxSeen().includes(key);
-        const label = mine ? 'Teşekkür ettin' : `${nameOf(t.by)} teşekkür ediyor`;
+        const label = mine ? 'Teşekkürü geri al' : `${nameOf(t.by)} teşekkür ediyor`;
+        if (mine) return selectedDateKey < getTodayKey() ? '' : `<button onclick="thankFor('${id}', this)" class="text-red-500 p-0.5 -m-0.5 shrink-0 inline-flex active:scale-110 transition-transform" title="${label}" aria-label="${label}"><svg class="w-[18px] h-[18px]" fill="currentColor" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="${HEART}"/></svg></button>`;
         return `<button onclick="thanksTap(this)" data-thx="${id}" data-msg="${escHtml(label)}"${fresh ? ` data-fresh="${escHtml(key)}"` : ''} class="text-red-500 p-0.5 -m-0.5 shrink-0 inline-flex active:scale-110 transition-transform" title="${escHtml(label)}" aria-label="${escHtml(label)}"><svg class="w-[18px] h-[18px]" fill="currentColor" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="${HEART}"/></svg></button>`;
       }
       if (selectedDateKey < getTodayKey() || editMode || gaveDose(e)) return '';
@@ -1850,6 +1855,12 @@
     };
     window.thankFor = async (id, btn) => {
       const e = (logs[selectedDateKey] || {})[id];
+      if (e && e.thanks && e.thanks.by === currentProfile && selectedDateKey >= getTodayKey()) {
+        // Kendi teşekkürünü geri al
+        try { await updateDoc(doc(db, 'families', familyCode, 'logs', selectedDateKey), { [`${id}.thanks`]: deleteField() }); showToast('Teşekkür geri alındı', 'GERİ ALINDI'); }
+        catch (err) { showToast('Geri alınamadı, tekrar dene', 'HATA'); }
+        return;
+      }
       if (!e || e.status !== 'done' || gaveDose(e) || e.thanks) return;
       if (btn) { const b = btn.getBoundingClientRect(); heartBurst(b.left + 20, b.top, 12); btn.disabled = true; }
       try {
