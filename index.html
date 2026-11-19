@@ -1817,22 +1817,27 @@
       if (selectedDateKey < getTodayKey() || editMode || gaveDose(e)) return '';
       return `<button onclick="thankFor('${id}', this)" class="text-muted hover:text-red-500 p-0.5 -m-0.5 shrink-0 transition-colors" title="Teşekkür et" aria-label="Teşekkür et"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="${HEART}"/></svg></button>`;
     }
+    // Ekranın ortasından yavaşça yayılan kalp ve konfeti (x, y yok sayılır; eski çağrılarla uyumlu kalsın diye parametre bırakıldı).
     function heartBurst(x, y, n) {
       if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       const cols = ['#e11d48', '#f43f5e', '#fb7185', '#f59e0b', '#fbbf24', '#ec4899'];
-      for (let i = 0; i < n; i++) {
+      const cx = innerWidth / 2, cy = innerHeight * 0.45, spread = Math.min(innerWidth, 520) * 0.42;
+      const total = Math.max(n || 0, 28);
+      for (let i = 0; i < total; i++) {
         const el = document.createElement('span');
-        const heart = i % 3 !== 2;
+        const heart = i % 4 !== 3, c = cols[i % cols.length], size = heart ? 20 + Math.random() * 20 : 7;
         el.textContent = heart ? '♥' : '';
-        el.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:200;pointer-events:none;color:${cols[i % cols.length]};font-size:${10 + Math.random() * 12}px;line-height:1;` + (heart ? '' : `width:6px;height:9px;background:${cols[i % cols.length]};border-radius:1px;`);
+        el.style.cssText = `position:fixed;left:${cx}px;top:${cy}px;z-index:200;pointer-events:none;color:${c};font-size:${size}px;line-height:1;will-change:transform,opacity;` + (heart ? 'text-shadow:0 1px 4px rgba(225,29,72,.25);' : `width:7px;height:11px;background:${c};border-radius:1px;`);
         document.body.appendChild(el);
-        const ang = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, dist = 60 + Math.random() * 120;
-        const dx = Math.cos(ang) * dist, dy = Math.sin(ang) * dist;
+        const ang = Math.random() * Math.PI * 2, r = spread * (0.35 + Math.random() * 0.75);
+        const dx = Math.cos(ang) * r, dy = Math.sin(ang) * r * 0.8 - 40;
+        const sway = (Math.random() - 0.5) * 50, rot = (Math.random() - 0.5) * 80;
         const a = el.animate([
-          { transform: 'translate(-50%,-50%) scale(.4) rotate(0deg)', opacity: 1 },
-          { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy - 20}px)) scale(1) rotate(${(Math.random() - 0.5) * 120}deg)`, opacity: 1, offset: 0.55 },
-          { transform: `translate(calc(-50% + ${dx * 1.15}px), calc(-50% + ${dy + 90}px)) scale(.9) rotate(${(Math.random() - 0.5) * 240}deg)`, opacity: 0 }
-        ], { duration: 1500 + Math.random() * 700, easing: 'cubic-bezier(.2,.7,.3,1)', delay: Math.random() * 120 });
+          { transform: 'translate(-50%,-50%) scale(.2) rotate(0deg)', opacity: 0 },
+          { transform: `translate(calc(-50% + ${dx * 0.55}px), calc(-50% + ${dy * 0.55}px)) scale(1.15) rotate(${rot * 0.5}deg)`, opacity: 1, offset: 0.25 },
+          { transform: `translate(calc(-50% + ${dx + sway}px), calc(-50% + ${dy - 30}px)) scale(1) rotate(${rot}deg)`, opacity: 1, offset: 0.7 },
+          { transform: `translate(calc(-50% + ${dx + sway * 1.6}px), calc(-50% + ${dy + 70}px)) scale(.9) rotate(${rot * 1.4}deg)`, opacity: 0 }
+        ], { duration: 3200 + Math.random() * 1400, easing: 'cubic-bezier(.22,.8,.3,1)', delay: Math.random() * 350 });
         a.onfinish = () => el.remove();
       }
     }
