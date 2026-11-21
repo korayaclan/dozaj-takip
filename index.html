@@ -912,6 +912,7 @@
       [/^(\d)\. doz saati$/, function (m, n) { return 'Dose ' + n + ' time'; }],
       [/^✓ (.+) verdi · (.+)$/, function (m, w, t) { return '✓ Given by ' + nm(w) + ' · ' + t; }],
       [/^✓ Verildi · (.+)$/, function (m, t) { return '✓ Given · ' + t; }],
+      [/^Bildirim kurulamadı: (.+)$/, function (m, e) { return 'Could not set up notifications: ' + e; }],
       [/^(.+) teşekkür ediyor$/, function (m, w) { return nm(w) + ' says thank you'; }],
       [/^(.+) tarafından verildi$/, function (m, w) { return 'Given by ' + nm(w); }],
       [/^(.+) tarafından es geçildi$/, function (m, w) { return 'Skipped by ' + nm(w); }],
@@ -1761,7 +1762,8 @@
       try {
         const perm = await Notification.requestPermission();
         if (perm === 'granted') {
-          await syncPushToken();
+          const err = await syncPushToken();
+          if (err) { btn.disabled = false; btn.textContent = 'Tekrar Dene'; showToast('Bildirim kurulamadı: ' + err, 'HATA'); return; }
           document.getElementById('notif-banner').classList.add('hidden');
           showToast('Bildirimler aktifleştirildi!', 'HAZIR');
         } else {
@@ -1774,16 +1776,16 @@
     };
 
     async function syncPushToken() {
-      if (!messaging) return;
+      if (!messaging) return 'messaging-yok';
       try {
         const reg = await navigator.serviceWorker.ready;
         const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
-        if (token) {
-          await updateDoc(doc(db, 'families', familyCode), {
-            [`tokens.${currentProfile}`]: token
-          });
-        }
-      } catch (e) { console.error('Token hatası:', e); }
+        if (!token) return 'token-bos';
+        await updateDoc(doc(db, 'families', familyCode), {
+          [`tokens.${currentProfile}`]: token
+        });
+        return '';
+      } catch (e) { console.error('Token hatası:', e); return (e && (e.code || e.message) || 'bilinmeyen').toString().slice(0, 80); }
     }
 
     // --- BİLDİRİM TANISI ---
