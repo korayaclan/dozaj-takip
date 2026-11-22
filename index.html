@@ -328,6 +328,7 @@
       <div class="mt-3 text-xs text-muted flex flex-wrap gap-x-5 gap-y-1">
         <button onclick="exportRecords()" class="hover:text-ink underline underline-offset-4 transition">Kayıtları indir (CSV)</button>
         <button onclick="openShare()" class="hover:text-ink underline underline-offset-4 transition">Görüntüleme bağlantısı</button>
+        <button onclick="checkPush()" class="hover:text-ink underline underline-offset-4 transition">Bildirim durumu</button>
         <button onclick="editNames()" id="btn-edit-names" class="hidden hover:text-ink underline underline-offset-4 transition">Adları düzenle</button>
         <a href="gizlilik.html" class="hover:text-ink underline underline-offset-4 transition">Gizlilik</a>
         <button onclick="setLang(LANG==='en'?'tr':'en')" class="lang-btn hover:text-ink underline underline-offset-4 transition">English</button>
@@ -850,7 +851,11 @@
       "GERİ ALINDI": "UNDONE",
       "Geri alınamadı, tekrar dene": "Could not undo, try again",
       "Göstermek için dokun": "Tap to show",
-      "E-posta adresini göster": "Show email address"
+      "E-posta adresini göster": "Show email address",
+      "Bildirim durumu": "Notification status",
+      "Bildirim kaydı tamam": "Notification registration OK",
+      "Kontrol ediliyor...": "Checking...",
+      "Bu tarayıcı bildirimi desteklemiyor": "This browser does not support notifications"
 
     };
     function nm(x) { x = String(x); return x === 'Anne' ? 'Mom' : x === 'Baba' ? 'Dad' : x === 'Sen' ? 'You' : x; }
@@ -1789,6 +1794,15 @@
     }
 
     // --- BİLDİRİM TANISI ---
+    // Ayarlar > "Bildirim durumu": izin ve token kaydı adım adım denenir, sonuç (ya da hata kodu) ekrana yazılır.
+    window.checkPush = async () => {
+      if (!('Notification' in window) || !('serviceWorker' in navigator)) { showToast('Bu tarayıcı bildirimi desteklemiyor', 'HATA'); return; }
+      if (Notification.permission !== 'granted') { showToast('Bildirim izni yok (' + Notification.permission + ')', 'HATA'); return; }
+      showToast('Kontrol ediliyor...', 'BİLGİ');
+      const err = await syncPushToken();
+      showToast(err ? 'Bildirim kurulamadı: ' + err : 'Bildirim kaydı tamam', err ? 'HATA' : 'HAZIR');
+    };
+
     // Tüm kayıtları Excel / Google E-Tablolar'da açılabilen CSV olarak indirir (yedek ve doktora göstermek için)
     window.exportRecords = () => {
       const esc = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
