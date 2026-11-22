@@ -513,6 +513,20 @@
           <label class="block text-xs font-semibold text-ink mb-1">Kaç gün kullanılacak? <span class="font-normal text-muted">(isteğe bağlı)</span></label>
           <input id="edit-days" type="number" min="1" max="365" inputmode="numeric" placeholder="Boş = süresiz" class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" />
         </div>
+        <div id="edit-bottle-box" class="border-t border-line pt-3 space-y-2">
+          <label class="block text-xs font-semibold text-ink">Şişe takibi <span class="font-normal text-muted">(isteğe bağlı)</span></label>
+          <div id="edit-bottle-opts" class="flex flex-wrap gap-1.5"></div>
+          <div id="edit-bottle-more" class="hidden space-y-2">
+            <div class="grid grid-cols-2 gap-2">
+              <div><label class="block text-[11px] text-muted mb-1">Şişede kaç ml?</label><input id="edit-vol" type="number" step="0.1" min="1" inputmode="decimal" oninput="bottleUi()" class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" /></div>
+              <div><label class="block text-[11px] text-muted mb-1">Her seferde</label><div class="flex gap-1.5"><input id="edit-dose" type="number" step="0.01" min="0" inputmode="decimal" oninput="bottleUi()" class="min-w-0 flex-1 px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" /><div id="edit-unit" class="flex rounded-md border border-line overflow-hidden text-xs font-semibold shrink-0"></div></div></div>
+            </div>
+            <div id="edit-conc-box" class="hidden"><label class="block text-[11px] text-muted mb-1">Yoğunluk (mg/ml)</label><input id="edit-conc" type="number" step="0.01" min="0" inputmode="decimal" value="57.64" oninput="bottleUi()" class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" /></div>
+            <div id="edit-open-box" class="hidden"><label class="block text-[11px] text-muted mb-1">Şişe bugün saat kaçta açıldı?</label><input id="edit-open" type="time" class="w-full px-3 py-2 text-sm bg-paper border border-line rounded-md focus:outline-none focus:border-ink" /></div>
+            <label id="edit-newb-box" class="hidden items-center gap-2 text-xs text-ink"><input type="checkbox" id="edit-newb" onchange="bottleUi()" class="accent-neutral-900"> Yeni şişe açtım, şimdiden say</label>
+            <p id="edit-dose-hint" class="text-[11px] text-muted"></p>
+          </div>
+        </div>
         <div id="edit-grp-priority">
           <label class="block text-xs font-semibold text-ink mb-1.5">Onay Tipi</label>
           <div class="grid grid-cols-2 gap-2">
@@ -855,7 +869,17 @@
       "Bildirim durumu": "Notification status",
       "Bildirim kaydı tamam": "Notification registration OK",
       "Kontrol ediliyor...": "Checking...",
-      "Bu tarayıcı bildirimi desteklemiyor": "This browser does not support notifications"
+      "Bu tarayıcı bildirimi desteklemiyor": "This browser does not support notifications",
+      "Şişe takibi": "Bottle tracking",
+      "Şişede kaç ml?": "How many ml in the bottle?",
+      "Her seferde": "Per dose",
+      "Yoğunluk (mg/ml)": "Concentration (mg/ml)",
+      "Yeni şişe açtım, şimdiden say": "I opened a new bottle, count from now",
+      "Takip yok": "No tracking",
+      "+ Yeni şişe": "+ New bottle",
+      "Şişe hacmi ve her seferde verilen miktar yazılmalı.": "Enter the bottle volume and the amount given each time.",
+      "Şişe bitti": "Bottle empty",
+      "Şişe bugün saat kaçta açıldı?": "What time was the bottle opened today?"
 
     };
     function nm(x) { x = String(x); return x === 'Anne' ? 'Mom' : x === 'Baba' ? 'Dad' : x === 'Sen' ? 'You' : x; }
@@ -918,6 +942,8 @@
       [/^✓ (.+) verdi · (.+)$/, function (m, w, t) { return '✓ Given by ' + nm(w) + ' · ' + t; }],
       [/^✓ Verildi · (.+)$/, function (m, t) { return '✓ Given · ' + t; }],
       [/^Bildirim kurulamadı: (.+)$/, function (m, e) { return 'Could not set up notifications: ' + e; }],
+      [/^Şişe: ~(.+) ml kaldı(?: · ~(\d+) gün \((.+)\)| · (bugün biter))?$/, function (m, x, d, dt, td) { return 'Bottle: ~' + x.replace(',', '.') + ' ml left' + (d ? ' · ~' + d + ' days (' + dt + ')' : (td ? ' · runs out today' : '')); }],
+      [/^≈ (.+) ml \/ doz$/, function (m, x) { return '≈ ' + x.replace(',', '.') + ' ml / dose'; }],
       [/^(.+) teşekkür ediyor$/, function (m, w) { return nm(w) + ' says thank you'; }],
       [/^(.+) tarafından verildi$/, function (m, w) { return 'Given by ' + nm(w); }],
       [/^(.+) tarafından es geçildi$/, function (m, w) { return 'Skipped by ' + nm(w); }],
@@ -1834,6 +1860,62 @@
       return `<button onclick="editNote('${routineId}')" class="text-muted hover:text-ink p-0.5 -m-0.5 shrink-0" title="${hasNote ? 'Notu düzenle' : 'Not ekle'}" aria-label="${hasNote ? 'Notu düzenle' : 'Not ekle'}"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="${PENCIL}"/></svg></button>`;
     }
     // --- Teşekkür kalbi: ilacı vermeyen kişi, veren kişiye ♥ gönderir ---
+    // --- Şişe takibi: şişe bilgisi ilaç kartlarının içinde saklanır (routine.bottle = {id, ml, at}, routine.doseMl); aynı id'li kartlar şişeyi paylaşır ---
+    const pad2 = (n) => String(n).padStart(2, '0');
+    const dayKeyOf = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+    const fmMl = (x) => String(Math.round(x * 10) / 10).replace('.', ',');
+    function bottleStats(bid) {
+      const linked = routines.filter(r => r.bottle && r.bottle.id === bid && r.doseMl > 0);
+      if (!linked.length) return null;
+      const b = linked[0].bottle, atDay = dayKeyOf(b.at), d0 = new Date(b.at), atTime = `${pad2(d0.getHours())}:${pad2(d0.getMinutes())}`;
+      let used = 0;
+      Object.keys(logs).forEach(day => {
+        if (day < atDay) return; const dl = logs[day] || {};
+        linked.forEach(r => {
+          const e = dl[r.id]; if (!e || e.status !== 'done') return;
+          const after = e.ts ? e.ts >= b.at : (day > atDay || String(e.time || '') >= atTime);
+          if (after) used += r.doseMl * (e.doses && e.doses.length ? e.doses.length : 1);
+        });
+      });
+      const left = Math.max(0, b.ml - used), daily = linked.filter(r => !r.asNeeded).reduce((a, r) => a + r.doseMl, 0);
+      return { left, days: daily > 0 ? left / daily : null };
+    }
+    function bottleLine(r) {
+      if (!r.bottle || !(r.doseMl > 0)) return '';
+      const st = bottleStats(r.bottle.id); if (!st) return '';
+      const low = st.left <= 0 || (st.days !== null && st.days <= 3);
+      let txt;
+      if (st.left <= 0) txt = 'Şişe bitti';
+      else {
+        txt = `Şişe: ~${fmMl(st.left)} ml kaldı`;
+        if (st.days !== null) {
+          const dd = Math.floor(st.days);
+          txt += dd < 1 ? ' · bugün biter' : ` · ~${dd} gün (${new Date(Date.now() + dd * 864e5).toLocaleDateString(LOC || 'tr-TR', { day: 'numeric', month: 'short' })})`;
+        }
+      }
+      return `<p class="text-[11px] mt-1 font-semibold ${low ? 'text-signal' : 'text-muted'}">${txt}</p>`;
+    }
+    let bottleSel = '', unitSel = 'ml';
+    function bottleChoices() {
+      const seen = {}; routines.forEach(r => { if (r.bottle && r.bottle.id) (seen[r.bottle.id] = seen[r.bottle.id] || []).push(r.groupName || r.name); });
+      return Object.keys(seen).map(id => ({ id, label: [...new Set(seen[id])].join(' + ') }));
+    }
+    window.pickBottle = (v) => { bottleSel = v; bottleUi(); };
+    window.pickUnit = (u) => { unitSel = u; bottleUi(); };
+    window.bottleUi = () => {
+      const opts = [{ id: '', label: 'Takip yok' }, ...bottleChoices(), { id: 'new', label: '+ Yeni şişe' }];
+      document.getElementById('edit-bottle-opts').innerHTML = opts.map(o => `<button type="button" onclick="pickBottle('${o.id}')" class="px-3 h-8 rounded-md border text-xs font-semibold ${o.id === bottleSel ? 'bg-ink text-white border-ink' : 'border-line text-ink'}">${escHtml(o.label)}</button>`).join('');
+      document.getElementById('edit-bottle-more').classList.toggle('hidden', !bottleSel);
+      document.getElementById('edit-unit').innerHTML = ['ml', 'mg'].map(u => `<button type="button" onclick="pickUnit('${u}')" class="px-3 h-[38px] ${u === unitSel ? 'bg-ink text-white' : ''}">${u}</button>`).join('<span class="w-px bg-line"></span>');
+      document.getElementById('edit-conc-box').classList.toggle('hidden', unitSel !== 'mg');
+      const nb = document.getElementById('edit-newb-box'); const isEx = bottleSel && bottleSel !== 'new';
+      nb.classList.toggle('hidden', !isEx); nb.classList.toggle('flex', !!isEx);
+      const ob = document.getElementById('edit-open-box'); const showOpen = bottleSel === 'new' || (isEx && document.getElementById('edit-newb').checked);
+      ob.classList.toggle('hidden', !showOpen);
+      if (showOpen && !document.getElementById('edit-open').value) { const n = new Date(); document.getElementById('edit-open').value = `${pad2(n.getHours())}:${pad2(n.getMinutes())}`; }
+      const v = parseFloat(document.getElementById('edit-dose').value), c = parseFloat(document.getElementById('edit-conc').value);
+      document.getElementById('edit-dose-hint').textContent = (unitSel === 'mg' && v > 0 && c > 0) ? `≈ ${fmMl(v / c)} ml / doz` : '';
+    };
     // Kartta "Geri al" kayıttan sonra 15 dakika görünür; sonrasında yalnızca "Listeyi düzenle / sil" içinde bulunur.
     const UNDO_MIN = 15;
     function undoFresh(e) {
@@ -2843,7 +2925,7 @@
               </div>
               <div>
                 <h3 class="text-sm font-bold flex items-center gap-1.5 ${isDone && !r.asNeeded || isSkipped ? 'text-muted line-through decoration-muted/50' : 'text-ink'}"><span class="text-muted shrink-0">${iconSvg(iconKey(r), 'w-4 h-4')}</span><span>${r.name}</span></h3>
-                ${(() => { const meta = [whoTag(r), r.note && r.note !== 'Esnek pencere' ? r.note : '', (r.courseDays && r.startedOn) ? `${Math.min(dayNumberOf(r, selectedDateKey), r.courseDays)}. gün / ${r.courseDays}` : ''].filter(Boolean).join(' · '); return meta ? `<p class="text-xs text-muted mt-0.5">${meta}</p>` : ''; })()}
+                ${(() => { const meta = [whoTag(r), r.note && r.note !== 'Esnek pencere' ? r.note : '', (r.courseDays && r.startedOn) ? `${Math.min(dayNumberOf(r, selectedDateKey), r.courseDays)}. gün / ${r.courseDays}` : ''].filter(Boolean).join(' · '); return (meta ? `<p class="text-xs text-muted mt-0.5">${meta}</p>` : '') + bottleLine(r); })()}
               </div>
             </div>
             ${editMode ? ''
@@ -3128,6 +3210,12 @@
       whoDatalist(); setWhoInputs('edit-who-box', whoNames(r));
       document.getElementById('edit-time').value = r.time;
       document.getElementById('edit-note').value = r.note || '';
+      bottleSel = r.bottle ? r.bottle.id : ''; unitSel = (r.dose && r.dose.unit) || 'ml';
+      document.getElementById('edit-vol').value = r.bottle ? r.bottle.ml : 150;
+      document.getElementById('edit-dose').value = r.dose ? r.dose.v : '';
+      document.getElementById('edit-conc').value = (r.dose && r.dose.conc) || 57.64;
+      document.getElementById('edit-newb').checked = false; document.getElementById('edit-open').value = '';
+      bottleUi();
       document.querySelector(`input[name="edit-priority"][value="${r.priority === 'critical' ? 'critical' : 'standard'}"]`).checked = true;
       document.getElementById('edit-error').classList.add('hidden');
       const m = document.getElementById('edit-modal'); m.classList.remove('hidden'); m.classList.add('flex');
@@ -3152,12 +3240,25 @@
       const who = readWho('edit-who-box');
       const days = parseInt(document.getElementById('edit-days').value, 10);
       const minH = parseInt(document.getElementById('edit-minh').value, 10);
-      const updated = sortRoutines(routines.map(x => {
+      // Şişe takibi
+      let nb = null, dose = null, doseMl = 0;
+      if (bottleSel) {
+        const vol = parseFloat(document.getElementById('edit-vol').value), dv = parseFloat(document.getElementById('edit-dose').value), conc = parseFloat(document.getElementById('edit-conc').value);
+        if (!(vol > 0) || !(dv > 0) || (unitSel === 'mg' && !(conc > 0))) { err.textContent = 'Şişe hacmi ve her seferde verilen miktar yazılmalı.'; err.classList.remove('hidden'); return; }
+        doseMl = unitSel === 'mg' ? dv / conc : dv; dose = unitSel === 'mg' ? { v: dv, unit: 'mg', conc } : { v: dv, unit: 'ml' };
+        const old = bottleSel === 'new' ? null : (routines.find(x => x.bottle && x.bottle.id === bottleSel) || {}).bottle;
+        let openAt = Date.now(); const ot = document.getElementById('edit-open').value;
+        if (/^\d{1,2}:\d{2}$/.test(ot)) { const d = new Date(); const [hh, mm] = ot.split(':'); d.setHours(+hh, +mm, 0, 0); openAt = Math.min(d.getTime(), Date.now()); }
+        nb = (bottleSel === 'new' || !old || document.getElementById('edit-newb').checked) ? { id: bottleSel === 'new' || !old ? 'b' + Date.now().toString(36) : bottleSel, ml: vol, at: openAt } : { id: old.id, ml: vol, at: old.at };
+      }
+      const updated = sortRoutines(routines.map(x0 => {
+        const x = (nb && x0.id !== editingId && x0.bottle && x0.bottle.id === nb.id) ? { ...x0, bottle: nb } : x0;
         const inGroup = cur.groupId && x.groupId === cur.groupId;
         if (x.id !== editingId && !inGroup) return x;
         const n = { ...x, name, note, priority, allowSkip: priority !== 'critical', icon: pickedIcon('icon-edit') || iconKey(x) };
         if (x.groupId) { const old = cur.groupName || ''; n.groupName = name; n.name = (old && x.name.startsWith(old)) ? name + x.name.slice(old.length) : x.name; }
         if (who) n.who = who; else delete n.who;
+        if (x.id === editingId) { if (nb) { n.bottle = nb; n.dose = dose; n.doseMl = Math.round(doseMl * 1000) / 1000; } else { delete n.bottle; delete n.dose; delete n.doseMl; } }
         if (x.asNeeded) { /* saat yok */ } else if (x.id === editingId) n.time = time;
         if (x.asNeeded) { if (minH > 0) n.minHours = minH; else delete n.minHours; }
         if (days > 0) { n.courseDays = days; if (!n.startedOn) n.startedOn = getTodayKey(); }
