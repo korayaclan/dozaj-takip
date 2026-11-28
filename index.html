@@ -290,6 +290,7 @@
       </div>
 
       <div id="late-strip"></div>
+      <div id="yday-strip"></div>
       <div id="person-bar" class="hidden flex flex-wrap gap-2 mb-4"></div>
       <datalist id="who-list"></datalist>
 
@@ -879,7 +880,13 @@
       "+ Yeni şişe": "+ New bottle",
       "Şişe hacmi ve her seferde verilen miktar yazılmalı.": "Enter the bottle volume and the amount given each time.",
       "Şişe bitti": "Bottle empty",
-      "Şişe bugün saat kaçta açıldı?": "What time was the bottle opened today?"
+      "Şişe bugün saat kaçta açıldı?": "What time was the bottle opened today?",
+      "Verdiyseniz geriden işaretleyebilirsiniz. Kayıtta “sonradan işaretlendi” olarak görünür.": "If you gave it, you can mark it now. It will show as “marked later” in the record.",
+      "Evet, verdim": "Yes, I gave it",
+      "Hayır / kapat": "No / close",
+      "· sonradan işaretlendi": "· marked later",
+      "Dünkü doz işaretlendi": "Yesterday's dose marked",
+      "Dünkü dozu işaretle": "Mark yesterday's dose"
 
     };
     function nm(x) { x = String(x); return x === 'Anne' ? 'Mom' : x === 'Baba' ? 'Dad' : x === 'Sen' ? 'You' : x; }
@@ -2441,6 +2448,38 @@
     window.lateSkip = async (id) => { lateAskId = null; await recordAction(id, 'skipped'); renderLateStrip(); };
     window.lateHide = (id) => { try { localStorage.setItem(lateKey(id), '1'); } catch (e) { /* gizleme bu oturumla sınırlı kalır */ } lateAskId = null; renderLateStrip(); };
     setInterval(renderLateStrip, 60000);
+    // Dünün işaretlenmemiş kritik dozları: ertesi gün sonuna kadar geriden onaylanabilir (kayıtta "sonradan" diye görünür).
+    const ydayKey = (id) => `dozaj_yday_${getTodayKey()}_${id}`;
+    function ydayList() {
+      const yk = dayKeyAgo(1), yl = logs[yk] || {};
+      return routines.filter(r => r.priority === 'critical' && !r.asNeeded && isActiveOn(r, yk) && !yl[r.id] && !(() => { try { return localStorage.getItem(ydayKey(r.id)) === '1'; } catch (e) { return false; } })() && !(/^r_(\d{12,})/.test(r.id) && Number(/^r_(\d{12,})/.exec(r.id)[1]) > parseDateKey(yk).getTime() + 86400000));
+    }
+    function renderYdayStrip() {
+      const el = document.getElementById('yday-strip'); if (!el) return;
+      const list = ydayList();
+      if (!list.length) { el.innerHTML = ''; return; }
+      const btn = 'h-9 px-3 rounded-md text-xs font-semibold transition active:scale-[0.99]';
+      el.innerHTML = list.map(r => {
+        const planned = r.time.split(/[–-]/)[0].trim();
+        return `<div class="mb-4 p-3.5 rounded-lg border border-line bg-surface shadow-sm" role="status"><p class="text-sm font-semibold text-ink">Dün ${escHtml(r.groupName || r.name)} (${escHtml(planned)}) işaretlenmemiş</p><p class="text-xs text-muted mt-0.5">Verdiyseniz geriden işaretleyebilirsiniz. Kayıtta “sonradan işaretlendi” olarak görünür.</p><div class="mt-2.5 flex flex-wrap gap-2"><button onclick="ydayGive('${r.id}')" class="${btn} bg-ink text-white">Evet, verdim</button><button onclick="ydayNo('${r.id}')" class="${btn} border border-line bg-paper text-muted">Hayır / kapat</button></div></div>`;
+      }).join('');
+    }
+    window.ydayNo = (id) => { try { localStorage.setItem(ydayKey(id), '1'); } catch (e) { /* bu oturumla sınırlı */ } renderYdayStrip(); };
+    window.ydayGive = async (id) => {
+      const r = routines.find(x => x.id === id); if (!r) return;
+      const planned = r.time.split(/[–-]/)[0].trim();
+      const v = await uiDialog({ title: 'Dünkü dozu işaretle', text: `${r.groupName || r.name} dün kaçta verildi? Boş bırakırsanız ${planned} yazılır (SS:DD).`, ok: 'İşaretle', input: 'text', value: planned, placeholder: planned, maxlength: 5, allowEmpty: true });
+      if (v === null) return;
+      const t = /^\d{1,2}:\d{2}$/.test(v.trim()) ? v.trim().padStart(5, '0') : planned;
+      const yk = dayKeyAgo(1);
+      try {
+        const snap = await getDoc(doc(db, 'families', familyCode, 'logs', yk));
+        if ((snap.exists() ? snap.data() : {})[id]) { showToast('Bu doz zaten işaretlenmiş', 'KAYITLI'); return; }
+        await setDoc(doc(db, 'families', familyCode, 'logs', yk), { [id]: { status: 'done', by: currentProfile, time: t, ts: Date.now(), late: true } }, { merge: true });
+        showToast('Dünkü doz işaretlendi', 'KAYDEDİLDİ');
+      } catch (e) { console.error(e); showToast('Kaydedilemedi, tekrar dene', 'HATA'); }
+      renderYdayStrip();
+    };
     // 15 dakikası dolan kartlardaki "Geri al" kendiliğinden kaybolsun
     let undoSigLast = '';
     const undoSig = () => { const day = logs[getTodayKey()] || {}; return Object.keys(day).filter(k => day[k].by === currentProfile && undoFresh(day[k])).join(','); };
@@ -2944,7 +2983,7 @@
           actionHtml = `<div class="mt-3 pt-2.5 border-t border-line/70 text-xs text-muted">${info}${doses.length && !isSolo ? ` <span>(${escHtml(nameOf(entry.by))})</span>` : ''}${prnNote}${btn}</div>`;
         } else if (entry) {
           actionHtml = isDone
-            ? `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold text-forest"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>${isSolo ? 'Verildi' : `${escHtml(nameOf(entry.by))} tarafından verildi`}</span><span class="font-mono text-muted font-medium">${entry.time}</span></div>`
+            ? `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs"><span class="inline-flex items-center gap-1.5 font-semibold text-forest"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>${isSolo ? 'Verildi' : `${escHtml(nameOf(entry.by))} tarafından verildi`}${entry.late ? ' <span class="font-normal text-muted">· sonradan işaretlendi</span>' : ''}</span><span class="font-mono text-muted font-medium">${entry.time}</span></div>`
             : `<div class="mt-3 pt-2.5 border-t border-line/70 flex items-center justify-between text-xs text-muted"><span>${isSolo ? 'Es geçildi' : `${escHtml(nameOf(entry.by))} tarafından es geçildi`}</span><span class="font-mono">${entry.time}</span></div>`;
           if (entry.note) actionHtml += `<div class="mt-1.5">${noteHtml(r.id, entry)}</div>`;
         } else if (isPast) {
@@ -2982,7 +3021,7 @@
       const countable = visible.filter(r => !r.asNeeded).length;
       document.getElementById('progress-label').textContent = `${completedCount}/${countable}`;
       document.getElementById('progress-fill').style.width = countable > 0 ? `${(completedCount / countable) * 100}%` : '0%';
-      renderLateStrip(); updateStreakChip();
+      renderLateStrip(); renderYdayStrip(); updateStreakChip();
       celebrateThanks();
     }
 
@@ -3043,7 +3082,7 @@
         let rows = entries.length === 0 ? `<p class="text-xs text-muted italic mt-1">Kayıt girilmemiş.</p>` : `<div class="mt-2 space-y-1.5">` + entries.map(({ routine, log, auto }) => `
           <div class="flex items-center justify-between text-xs"><span class="font-medium text-ink">${routine.name}</span>${auto
             ? `<span class="font-mono text-[11px] text-signal">Verilmedi</span>`
-            : `<span class="font-mono text-[11px] ${log.status === 'done' ? 'text-forest' : 'text-muted'}">${log.status === 'done' ? (routine.asNeeded && log.doses && log.doses.length > 1 ? `${log.doses.length} kez · ${log.time}` : (isSolo ? log.time : `${escHtml(nameOf(log.by))} · ${log.time}`)) : (isSolo ? 'Es geçildi' : `Es geçildi (${escHtml(nameOf(log.by))})`)}</span>`}</div>${log && log.note ? `<div class="text-[11px] italic text-ink/70 -mt-0.5">“${escHtml(log.note)}”</div>` : ''}`).join('') + `</div>`;
+            : `<span class="font-mono text-[11px] ${log.status === 'done' ? 'text-forest' : 'text-muted'}">${log.status === 'done' ? (routine.asNeeded && log.doses && log.doses.length > 1 ? `${log.doses.length} kez · ${log.time}` : (isSolo ? log.time : `${escHtml(nameOf(log.by))} · ${log.time}`) + (log.late ? ' · sonradan' : '')) : (isSolo ? 'Es geçildi' : `Es geçildi (${escHtml(nameOf(log.by))})`)}</span>`}</div>${log && log.note ? `<div class="text-[11px] italic text-ink/70 -mt-0.5">“${escHtml(log.note)}”</div>` : ''}`).join('') + `</div>`;
         card.innerHTML = `<div class="flex items-center justify-between border-b border-line/60 pb-2"><span class="text-xs font-bold text-ink">${d.fullLabel}</span><button onclick="jumpToDate('${d.key}')" class="font-mono text-[11px] text-muted hover:text-ink underline underline-offset-2">Güne git →</button></div>${rows}`;
         feedEl.appendChild(card);
       });
